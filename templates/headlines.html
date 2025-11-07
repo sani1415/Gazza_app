@@ -1,0 +1,334 @@
+{% extends "base.html" %}
+
+{% block title %}عناوين الأخبار حسب التاريخ - أرشيف أخبار فلسطين{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<section class="py-4 bg-primary text-white">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="mb-0">
+                    <i class="fas fa-newspaper me-2"></i>
+                    عناوين الأخبار حسب التاريخ
+                </h1>
+                <p class="mb-0">اختر تاريخاً لعرض جميع العناوين من ذلك اليوم</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Date Selection -->
+<section class="py-4">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title text-center mb-4">اختر التاريخ</h5>
+                        <form id="dateForm">
+                            <div class="mb-3">
+                                <label for="dateInput" class="form-label">التاريخ</label>
+                                <input type="date" class="form-control" id="dateInput" required>
+                            </div>
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-search me-2"></i>
+                                    عرض العناوين
+                                </button>
+                                <button type="button" class="btn btn-success" onclick="exportToWord(false)" id="exportBtn" disabled>
+                                    <i class="fas fa-file-word me-2"></i>
+                                    تصدير إلى Word (العناوين فقط)
+                                </button>
+                                <button type="button" class="btn btn-info" onclick="exportToWord(true)" id="exportFullBtn" disabled>
+                                    <i class="fas fa-file-alt me-2"></i>
+                                    تصدير إلى Word (المحتوى الكامل)
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Results Section -->
+<section class="py-4" id="resultsSection" style="display: none;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0" id="resultsTitle">عناوين الأخبار</h5>
+                        <span class="badge bg-primary" id="resultsCount">0 مقال</span>
+                    </div>
+                    <div class="card-body">
+                        <!-- Loading -->
+                        <div id="loadingIndicator" class="text-center py-4" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">جاري التحميل...</span>
+                            </div>
+                            <p class="mt-2">جاري تحميل العناوين...</p>
+                        </div>
+                        
+                        <!-- No Results -->
+                        <div id="noResults" class="text-center py-4" style="display: none;">
+                            <i class="fas fa-newspaper fa-3x text-muted mb-3"></i>
+                            <h5>لا توجد مقالات في هذا التاريخ</h5>
+                            <p class="text-muted">جرب تاريخاً آخر أو تحقق من صحة التاريخ المحدد</p>
+                        </div>
+                        
+                        <!-- Headlines List -->
+                        <div id="headlinesList">
+                            <!-- Headlines will be loaded here -->
+                        </div>
+                        
+                        <!-- Pagination -->
+                        <nav id="paginationNav" style="display: none;">
+                            <ul class="pagination justify-content-center" id="paginationList">
+                                <!-- Pagination buttons will be generated here -->
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 1;
+let currentDate = '';
+const perPage = 50;
+
+// Date form submission
+document.getElementById('dateForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const selectedDate = document.getElementById('dateInput').value;
+    if (selectedDate) {
+        currentDate = selectedDate;
+        currentPage = 1;
+        loadHeadlines(selectedDate, 1);
+    }
+});
+
+// Load headlines function
+function loadHeadlines(date, page) {
+    const resultsSection = document.getElementById('resultsSection');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const noResults = document.getElementById('noResults');
+    const headlinesList = document.getElementById('headlinesList');
+    const paginationNav = document.getElementById('paginationNav');
+    
+    // Show loading
+    resultsSection.style.display = 'block';
+    loadingIndicator.style.display = 'block';
+    noResults.style.display = 'none';
+    headlinesList.innerHTML = '';
+    paginationNav.style.display = 'none';
+    
+    // Fetch headlines
+    fetch(`/api/headlines?date=${date}&page=${page}&per_page=${perPage}`)
+        .then(response => response.json())
+        .then(data => {
+            loadingIndicator.style.display = 'none';
+            
+            if (data.total === 0) {
+                noResults.style.display = 'block';
+                document.getElementById('resultsTitle').textContent = `عناوين الأخبار - ${formatDate(date)}`;
+                document.getElementById('resultsCount').textContent = '0 مقال';
+                // Disable export buttons
+                document.getElementById('exportBtn').disabled = true;
+                document.getElementById('exportFullBtn').disabled = true;
+            } else {
+                displayHeadlines(data.articles);
+                document.getElementById('resultsTitle').textContent = `عناوين الأخبار - ${formatDate(date)}`;
+                document.getElementById('resultsCount').textContent = `${data.total.toLocaleString()} مقال`;
+                
+                // Enable export buttons
+                document.getElementById('exportBtn').disabled = false;
+                document.getElementById('exportFullBtn').disabled = false;
+                
+                if (data.total_pages > 1) {
+                    displayPagination(data.page, data.total_pages);
+                }
+            }
+        })
+        .catch(error => {
+            loadingIndicator.style.display = 'none';
+            headlinesList.innerHTML = `
+                <div class="alert alert-danger text-center">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    حدث خطأ في تحميل العناوين. يرجى المحاولة مرة أخرى.
+                </div>
+            `;
+        });
+}
+
+// Display headlines
+function displayHeadlines(articles) {
+    const headlinesList = document.getElementById('headlinesList');
+    
+    if (articles.length === 0) {
+        headlinesList.innerHTML = '<p class="text-muted text-center">لا توجد مقالات</p>';
+        return;
+    }
+    
+    let html = '<div class="list-group">';
+    
+    articles.forEach(article => {
+        const typeLabel = getTypeLabel(article.type);
+        const typeClass = getTypeClass(article.type);
+        
+        html += `
+            <div class="list-group-item list-group-item-action">
+                <div class="d-flex w-100 justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <h6 class="mb-2">
+                            <a href="/article/${article.id}" class="text-decoration-none text-dark">
+                                ${article.title}
+                            </a>
+                        </h6>
+                        <div class="d-flex align-items-center">
+                            <span class="badge ${typeClass} me-2">${typeLabel}</span>
+                            <small class="text-muted">
+                                <i class="fas fa-calendar me-1"></i>
+                                ${formatDate(article.date)}
+                            </small>
+                        </div>
+                    </div>
+                    <div class="ms-3">
+                        <a href="${article.link}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    headlinesList.innerHTML = html;
+}
+
+// Display pagination
+function displayPagination(currentPage, totalPages) {
+    const paginationNav = document.getElementById('paginationNav');
+    const paginationList = document.getElementById('paginationList');
+    
+    paginationNav.style.display = 'block';
+    
+    let html = '';
+    
+    // Previous button
+    if (currentPage > 1) {
+        html += `
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="loadHeadlines('${currentDate}', ${currentPage - 1})">
+                    <i class="fas fa-chevron-right"></i>
+                </a>
+            </li>
+        `;
+    }
+    
+    // Page numbers
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const activeClass = i === currentPage ? 'active' : '';
+        html += `
+            <li class="page-item ${activeClass}">
+                <a class="page-link" href="#" onclick="loadHeadlines('${currentDate}', ${i})">${i}</a>
+            </li>
+        `;
+    }
+    
+    // Next button
+    if (currentPage < totalPages) {
+        html += `
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="loadHeadlines('${currentDate}', ${currentPage + 1})">
+                    <i class="fas fa-chevron-left"></i>
+                </a>
+            </li>
+        `;
+    }
+    
+    paginationList.innerHTML = html;
+}
+
+// Helper functions
+function getTypeLabel(type) {
+    const labels = {
+        'post': 'مقال',
+        'video': 'فيديو',
+        'liveblog': 'بث مباشر',
+        'episode': 'حلقة',
+        'gallery': 'معرض صور'
+    };
+    return labels[type] || type;
+}
+
+function getTypeClass(type) {
+    const classes = {
+        'post': 'bg-primary',
+        'video': 'bg-danger',
+        'liveblog': 'bg-success',
+        'episode': 'bg-warning',
+        'gallery': 'bg-info'
+    };
+    return classes[type] || 'bg-secondary';
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ar-SA', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+}
+
+// Export to Word function
+function exportToWord(includeContent) {
+    if (!currentDate) {
+        alert('يرجى اختيار تاريخ أولاً');
+        return;
+    }
+    
+    const exportBtn = includeContent ? document.getElementById('exportFullBtn') : document.getElementById('exportBtn');
+    const originalText = exportBtn.innerHTML;
+    
+    // Show loading state
+    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>جاري التصدير...';
+    exportBtn.disabled = true;
+    
+    // Create download link
+    const url = `/api/export/word?date=${currentDate}&include_content=${includeContent}`;
+    
+    // Create temporary link and trigger download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `palestine_news_${currentDate.replace(/-/g, '_')}.docx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Reset button state after a delay
+    setTimeout(() => {
+        exportBtn.innerHTML = originalText;
+        exportBtn.disabled = false;
+    }, 2000);
+}
+
+// Set today's date as default
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('dateInput').value = today;
+});
+</script>
+{% endblock %}

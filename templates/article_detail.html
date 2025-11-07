@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }} - أرشيف أخبار فلسطين{% endblock %}
+
+{% block content %}
+<!-- Article Detail -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <!-- Article Header -->
+                        <div class="d-flex justify-content-between align-items-start mb-4">
+                            <div>
+                                <span class="article-type-badge article-type-{{ article.type }}">
+                                    {{ getTypeLabel(article.type) }}
+                                </span>
+                                <small class="text-muted ms-2">{{ article.date }}</small>
+                            </div>
+                            <a href="/search" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-arrow-right me-1"></i>
+                                العودة للبحث
+                            </a>
+                        </div>
+                        
+                        <!-- Article Title -->
+                        <h1 class="article-title mb-4">{{ article.title }}</h1>
+                        
+                        <!-- Article Image -->
+                        {% if article.image_url %}
+                        <div class="text-center mb-4">
+                            <img src="{{ article.image_url }}" class="img-fluid rounded" alt="صورة المقال" style="max-height: 400px;">
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Article Excerpt -->
+                        <div class="article-excerpt mb-4">
+                            <h5>ملخص المقال:</h5>
+                            <p class="lead">{{ article.excerpt }}</p>
+                        </div>
+                        
+                        <!-- Full Article Content -->
+                        <div class="article-content mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5>المحتوى الكامل:</h5>
+                                <button class="btn btn-outline-primary btn-sm" onclick="loadFullContent()" id="loadContentBtn">
+                                    <i class="fas fa-download me-1"></i>
+                                    تحميل المحتوى الكامل
+                                </button>
+                            </div>
+                            <div id="fullContent" class="content-placeholder">
+                                <div class="text-center py-4">
+                                    <i class="fas fa-newspaper fa-2x text-muted mb-3"></i>
+                                    <p class="text-muted">انقر على "تحميل المحتوى الكامل" لعرض المقال كاملاً</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Article Link -->
+                        <div class="article-link mb-4">
+                            <h5>رابط المقال الأصلي:</h5>
+                            <a href="{{ article.link }}" target="_blank" class="btn btn-outline-secondary">
+                                <i class="fas fa-external-link-alt me-2"></i>
+                                فتح المقال على الجزيرة نت
+                            </a>
+                        </div>
+                        
+                        <!-- Article Metadata -->
+                        <div class="article-metadata">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>معلومات المقال:</h6>
+                                    <ul class="list-unstyled">
+                                        <li><strong>المصدر:</strong> {{ article.source }}</li>
+                                        <li><strong>نوع المحتوى:</strong> {{ getTypeLabel(article.type) }}</li>
+                                        <li><strong>تاريخ النشر:</strong> {{ article.date }}</li>
+                                        <li><strong>معرف المقال:</strong> #{{ article.id }}</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>إجراءات:</h6>
+                                    <div class="d-grid gap-2">
+                                        <button class="btn btn-outline-primary" onclick="shareArticle()">
+                                            <i class="fas fa-share me-2"></i>
+                                            مشاركة المقال
+                                        </button>
+                                        <button class="btn btn-outline-secondary" onclick="printArticle()">
+                                            <i class="fas fa-print me-2"></i>
+                                            طباعة المقال
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Related Articles -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <h3 class="mb-4">
+                    <i class="fas fa-newspaper me-2"></i>
+                    مقالات ذات صلة
+                </h3>
+                <div id="relatedArticles">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">جاري التحميل...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Get type label in Arabic
+function getTypeLabel(type) {
+    const labels = {
+        'post': 'مقال',
+        'video': 'فيديو',
+        'liveblog': 'بث مباشر',
+        'episode': 'حلقة'
+    };
+    return labels[type] || type;
+}
+
+// Share article
+function shareArticle() {
+    if (navigator.share) {
+        navigator.share({
+            title: '{{ article.title }}',
+            text: '{{ article.excerpt }}',
+            url: window.location.href
+        });
+    } else {
+        // Fallback: copy to clipboard
+        const url = window.location.href;
+        navigator.clipboard.writeText(url).then(() => {
+            alert('تم نسخ رابط المقال إلى الحافظة');
+        });
+    }
+}
+
+// Print article
+function printArticle() {
+    window.print();
+}
+
+// Load related articles
+function loadRelatedArticles() {
+    // Extract keywords from title
+    const title = '{{ article.title }}';
+    const keywords = title.split(' ').slice(0, 3); // First 3 words
+    
+    const params = new URLSearchParams({
+        q: keywords.join(' '),
+        content_type: 'all',
+        type: 'all',
+        per_page: 6
+    });
+    
+    fetch(`/api/search?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            displayRelatedArticles(data.articles.filter(article => article.id !== {{ article.id }}));
+        })
+        .catch(error => {
+            console.error('Error loading related articles:', error);
+            document.getElementById('relatedArticles').innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    لا يمكن تحميل المقالات ذات الصلة حالياً
+                </div>
+            `;
+        });
+}
+
+// Display related articles
+function displayRelatedArticles(articles) {
+    const container = document.getElementById('relatedArticles');
+    
+    if (articles.length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>
+                لا توجد مقالات ذات صلة
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '<div class="row g-4">';
+    
+    articles.forEach(article => {
+        const typeClass = `article-type-${article.type}`;
+        const date = new Date(article.date).toLocaleDateString('ar-SA');
+        
+        html += `
+            <div class="col-md-6 col-lg-4">
+                <div class="card article-card h-100">
+                    ${article.image_url ? `
+                        <img src="${article.image_url}" class="card-img-top" alt="صورة المقال" style="height: 200px; object-fit: cover;">
+                    ` : ''}
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <span class="article-type-badge ${typeClass}">${getTypeLabel(article.type)}</span>
+                            <small class="text-muted">${date}</small>
+                        </div>
+                        <h6 class="card-title">${article.title}</h6>
+                        <p class="card-text text-muted small">${article.excerpt.substring(0, 100)}...</p>
+                        <a href="/article/${article.id}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-eye me-1"></i>
+                            قراءة المزيد
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+// Load full article content
+function loadFullContent() {
+    const contentDiv = document.getElementById('fullContent');
+    const loadBtn = document.getElementById('loadContentBtn');
+    
+    // Show loading state
+    loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>جاري التحميل...';
+    loadBtn.disabled = true;
+    
+    contentDiv.innerHTML = `
+        <div class="text-center py-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">جاري تحميل المحتوى...</span>
+            </div>
+            <p class="mt-2">جاري تحميل المحتوى الكامل للمقال...</p>
+        </div>
+    `;
+    
+    // Fetch content from API
+    fetch(`/api/article/{{ article.id }}/content`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                contentDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        ${data.error}
+                    </div>
+                `;
+            } else {
+                // Format the content
+                const formattedContent = data.content
+                    .split('\n')
+                    .map(paragraph => paragraph.trim())
+                    .filter(paragraph => paragraph.length > 0)
+                    .map(paragraph => `<p class="mb-3">${paragraph}</p>`)
+                    .join('');
+                
+                contentDiv.innerHTML = `
+                    <div class="article-full-content">
+                        ${formattedContent}
+                    </div>
+                `;
+                
+                // Hide the load button
+                loadBtn.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading content:', error);
+            contentDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    حدث خطأ في تحميل المحتوى. يرجى المحاولة مرة أخرى.
+                </div>
+            `;
+        })
+        .finally(() => {
+            // Reset button state
+            loadBtn.innerHTML = '<i class="fas fa-download me-1"></i>تحميل المحتوى الكامل';
+            loadBtn.disabled = false;
+        });
+}
+
+// Load related articles on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadRelatedArticles();
+});
+</script>
+
+<style>
+.article-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #333;
+}
+
+.article-excerpt {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 10px;
+    border-left: 4px solid #667eea;
+}
+
+.article-metadata {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 10px;
+}
+
+.article-full-content {
+    background: #ffffff;
+    padding: 2rem;
+    border-radius: 10px;
+    border: 1px solid #e9ecef;
+    line-height: 1.8;
+    font-size: 1.1rem;
+}
+
+.article-full-content p {
+    text-align: justify;
+    margin-bottom: 1rem;
+}
+
+.content-placeholder {
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    border-radius: 10px;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+@media print {
+    .btn, .navbar, footer {
+        display: none !important;
+    }
+    
+    .article-title {
+        font-size: 2rem;
+    }
+    
+    .article-excerpt {
+        background: none;
+        border: none;
+        padding: 0;
+    }
+}
+</style>
+{% endblock %}

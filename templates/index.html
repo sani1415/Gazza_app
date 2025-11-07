@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+
+{% block title %}الرئيسية - أرشيف أخبار فلسطين{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section">
+    <div class="container">
+        <h1 class="hero-title">أرشيف أخبار فلسطين</h1>
+        <p class="hero-subtitle">مجموعة شاملة من {{ stats.total_articles | number_format }} مقال إخباري من الجزيرة نت</p>
+        <a href="/search" class="btn btn-primary btn-lg">
+            <i class="fas fa-search me-2"></i>
+            ابدأ البحث
+        </a>
+    </div>
+</section>
+
+<!-- Statistics Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="stats-number">{{ stats.total_articles | number_format }}</div>
+                    <div class="stats-label">مقال إخباري</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="stats-number">{{ stats.article_types.post | number_format }}</div>
+                    <div class="stats-label">مقالات عادية</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="stats-number">{{ stats.article_types.video | number_format }}</div>
+                    <div class="stats-label">فيديوهات</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="stats-card">
+                    <div class="stats-number">{{ stats.article_types.liveblog | number_format }}</div>
+                    <div class="stats-label">بث مباشر</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Timeline Chart -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-chart-line me-2"></i>
+                            توزيع المقالات عبر الزمن
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="timelineChart" height="100"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Quick Search -->
+<section class="py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-body text-center">
+                        <h3 class="card-title mb-4">البحث السريع</h3>
+                        <form id="quickSearchForm">
+                            <div class="input-group mb-3">
+                                <input type="text" class="form-control search-box" id="quickSearch" 
+                                       placeholder="ابحث عن كلمات مفتاحية...">
+                                <button class="btn btn-primary" type="submit">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <select class="form-select" id="contentType">
+                                        <option value="all">جميع الأنواع</option>
+                                        <option value="post">مقالات</option>
+                                        <option value="video">فيديوهات</option>
+                                        <option value="liveblog">بث مباشر</option>
+                                        <option value="episode">حلقات</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <select class="form-select" id="searchType">
+                                        <option value="all">العنوان والمحتوى</option>
+                                        <option value="title">العنوان فقط</option>
+                                        <option value="excerpt">المحتوى فقط</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Popular Keywords -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-tags me-2"></i>
+                            الكلمات المفتاحية الشائعة
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="keywordsContainer">
+                            <div class="col-md-3 mb-2">
+                                <button class="btn btn-outline-primary keyword-btn" data-keyword="غزة">غزة</button>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <button class="btn btn-outline-primary keyword-btn" data-keyword="الضفة">الضفة</button>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <button class="btn btn-outline-primary keyword-btn" data-keyword="القدس">القدس</button>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <button class="btn btn-outline-primary keyword-btn" data-keyword="حماس">حماس</button>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <button class="btn btn-outline-primary keyword-btn" data-keyword="إسرائيل">إسرائيل</button>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <button class="btn btn-outline-primary keyword-btn" data-keyword="الاحتلال">الاحتلال</button>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <button class="btn btn-outline-primary keyword-btn" data-keyword="شهداء">شهداء</button>
+                            </div>
+                            <div class="col-md-3 mb-2">
+                                <button class="btn btn-outline-primary keyword-btn" data-keyword="مفاوضات">مفاوضات</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Timeline Chart
+const timelineData = {{ timeline_data | tojson | safe }};
+const ctx = document.getElementById('timelineChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: timelineData.map(item => item[0]),
+        datasets: [{
+            label: 'عدد المقالات',
+            data: timelineData.map(item => item[1]),
+            borderColor: '#667eea',
+            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+            tension: 0.4,
+            fill: true
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                labels: {
+                    font: {
+                        family: 'Noto Sans Arabic'
+                    }
+                }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    font: {
+                        family: 'Noto Sans Arabic'
+                    }
+                }
+            },
+            x: {
+                ticks: {
+                    font: {
+                        family: 'Noto Sans Arabic'
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Quick Search
+document.getElementById('quickSearchForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const query = document.getElementById('quickSearch').value;
+    const contentType = document.getElementById('contentType').value;
+    const searchType = document.getElementById('searchType').value;
+    
+    if (query.trim()) {
+        window.location.href = `/search?q=${encodeURIComponent(query)}&content_type=${contentType}&type=${searchType}`;
+    }
+});
+
+// Keyword buttons
+document.querySelectorAll('.keyword-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        const keyword = this.dataset.keyword;
+        window.location.href = `/search?q=${encodeURIComponent(keyword)}`;
+    });
+});
+</script>
+{% endblock %}

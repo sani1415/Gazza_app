@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}البحث - أرشيف أخبار فلسطين{% endblock %}
+
+{% block content %}
+<!-- Search Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">
+                            <i class="fas fa-search me-2"></i>
+                            البحث في الأرشيف
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="searchForm">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">كلمات البحث</label>
+                                    <input type="text" class="form-control search-box" id="searchQuery" 
+                                           placeholder="ابحث عن كلمات مفتاحية...">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">نوع المحتوى</label>
+                                    <select class="form-select" id="contentType">
+                                        <option value="all">جميع الأنواع</option>
+                                        <option value="post">مقالات</option>
+                                        <option value="video">فيديوهات</option>
+                                        <option value="liveblog">بث مباشر</option>
+                                        <option value="episode">حلقات</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">نوع البحث</label>
+                                    <select class="form-select" id="searchType">
+                                        <option value="all">العنوان والمحتوى</option>
+                                        <option value="title">العنوان فقط</option>
+                                        <option value="excerpt">المحتوى فقط</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="row g-3 mt-2">
+                                <div class="col-md-4">
+                                    <label class="form-label">من تاريخ</label>
+                                    <input type="date" class="form-control" id="dateFrom">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">إلى تاريخ</label>
+                                    <input type="date" class="form-control" id="dateTo">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="submit" class="btn btn-primary w-100">
+                                        <i class="fas fa-search me-2"></i>
+                                        بحث
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Results Section -->
+<section class="py-3">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div id="searchResults">
+                    <div class="text-center py-5">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <h4 class="text-muted">ابدأ البحث لرؤية النتائج</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Pagination -->
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <nav id="pagination" style="display: none;">
+                <ul class="pagination justify-content-center"></ul>
+            </nav>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 1;
+let totalPages = 1;
+let currentQuery = '';
+
+// Search form submission
+document.getElementById('searchForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    performSearch(1);
+});
+
+// Perform search
+function performSearch(page = 1) {
+    const query = document.getElementById('searchQuery').value;
+    const contentType = document.getElementById('contentType').value;
+    const searchType = document.getElementById('searchType').value;
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    
+    currentQuery = query;
+    currentPage = page;
+    
+    // Show loading
+    document.getElementById('searchResults').innerHTML = `
+        <div class="loading">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">جاري البحث...</span>
+            </div>
+            <p class="mt-2">جاري البحث...</p>
+        </div>
+    `;
+    
+    // Build URL
+    const params = new URLSearchParams({
+        q: query,
+        type: searchType,
+        content_type: contentType,
+        date_from: dateFrom,
+        date_to: dateTo,
+        page: page,
+        per_page: 20
+    });
+    
+    // Fetch results
+    fetch(`/api/search?${params}`)
+        .then(response => response.json())
+        .then(data => {
+            displayResults(data);
+            updatePagination(data);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('searchResults').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    حدث خطأ أثناء البحث. يرجى المحاولة مرة أخرى.
+                </div>
+            `;
+        });
+}
+
+// Display search results
+function displayResults(data) {
+    const resultsContainer = document.getElementById('searchResults');
+    
+    if (data.articles.length === 0) {
+        resultsContainer.innerHTML = `
+            <div class="text-center py-5">
+                <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                <h4 class="text-muted">لم يتم العثور على نتائج</h4>
+                <p class="text-muted">جرب كلمات بحث مختلفة أو قم بتعديل المرشحات</p>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h5>تم العثور على ${data.total.toLocaleString()} نتيجة</h5>
+            <small class="text-muted">الصفحة ${data.page} من ${data.total_pages}</small>
+        </div>
+        <div class="row g-4">
+    `;
+    
+    data.articles.forEach(article => {
+        const typeClass = `article-type-${article.type}`;
+        const date = new Date(article.date).toLocaleDateString('ar-SA');
+        
+        html += `
+            <div class="col-md-6 col-lg-4">
+                <div class="card article-card h-100">
+                    ${article.image_url ? `
+                        <img src="${article.image_url}" class="card-img-top" alt="صورة المقال" style="height: 200px; object-fit: cover;">
+                    ` : ''}
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <span class="article-type-badge ${typeClass}">${getTypeLabel(article.type)}</span>
+                            <small class="text-muted">${date}</small>
+                        </div>
+                        <h6 class="card-title">${article.title}</h6>
+                        <p class="card-text text-muted small">${article.excerpt.substring(0, 150)}...</p>
+                        <a href="/article/${article.id}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-eye me-1"></i>
+                            قراءة المزيد
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    resultsContainer.innerHTML = html;
+}
+
+// Update pagination
+function updatePagination(data) {
+    const pagination = document.getElementById('pagination');
+    const paginationUl = pagination.querySelector('ul');
+    
+    if (data.total_pages <= 1) {
+        pagination.style.display = 'none';
+        return;
+    }
+    
+    pagination.style.display = 'block';
+    
+    let html = '';
+    
+    // Previous button
+    if (data.page > 1) {
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="performSearch(${data.page - 1})">السابق</a></li>`;
+    }
+    
+    // Page numbers
+    const startPage = Math.max(1, data.page - 2);
+    const endPage = Math.min(data.total_pages, data.page + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const activeClass = i === data.page ? 'active' : '';
+        html += `<li class="page-item ${activeClass}"><a class="page-link" href="#" onclick="performSearch(${i})">${i}</a></li>`;
+    }
+    
+    // Next button
+    if (data.page < data.total_pages) {
+        html += `<li class="page-item"><a class="page-link" href="#" onclick="performSearch(${data.page + 1})">التالي</a></li>`;
+    }
+    
+    paginationUl.innerHTML = html;
+}
+
+// Get type label in Arabic
+function getTypeLabel(type) {
+    const labels = {
+        'post': 'مقال',
+        'video': 'فيديو',
+        'liveblog': 'بث مباشر',
+        'episode': 'حلقة'
+    };
+    return labels[type] || type;
+}
+
+// Load search parameters from URL
+window.addEventListener('load', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const query = urlParams.get('q');
+    const contentType = urlParams.get('content_type') || 'all';
+    const searchType = urlParams.get('type') || 'all';
+    
+    if (query) {
+        document.getElementById('searchQuery').value = query;
+        document.getElementById('contentType').value = contentType;
+        document.getElementById('searchType').value = searchType;
+        performSearch(1);
+    }
+});
+</script>
+{% endblock %}

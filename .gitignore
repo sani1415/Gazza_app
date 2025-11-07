@@ -1,0 +1,24 @@
+# Ignore virtual environment
+.venv/
+venv/
+
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+
+# IDE settings
+.vscode/
+.idea/
+
+# Environment and secret files
+.env
+*.env
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Log and temp files
+*.log
+*.tmp
+

@@ -1,0 +1,18 @@
+{
+  "total_articles": 29374,
+  "type_counts": {
+    "post": 25742,
+    "liveblog": 676,
+    "episode": 426,
+    "video": 2530
+  },
+  "date_range": "2023-10-05 to 2025-11-06",
+  "year_counts": {
+    "2023": 4413,
+    "2024": 13169,
+    "2025": 11792
+  },
+  "missing_dates": 0,
+  "missing_excerpts": 412,
+  "missing_images": 340
+}
