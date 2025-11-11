@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}أدوات الإدارة - أرشيف أخبار فلسطين{% endblock %}
+
+{% block content %}
+<section class="py-4 bg-secondary text-white">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center">
+                <h1 class="mb-2">
+                    <i class="fas fa-tools me-2"></i>
+                    لوحة الأدوات
+                </h1>
+                <p class="mb-0">إدارة التنزيلات، إنشاء الملفات، والعمل مع الصور بسهولة</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-5">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h3 class="card-title mb-4">
+                            <i class="fas fa-file-word me-2 text-primary"></i>
+                            إنشاء ملفات Word
+                        </h3>
+                        <form id="exportForm" class="row g-3">
+                            <div class="col-12">
+                                <label for="exportDate" class="form-label">التاريخ</label>
+                                <input type="date" class="form-control" id="exportDate" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">نوع الملف</label>
+                                <div class="list-group">
+                                    <button type="button" class="list-group-item list-group-item-action" id="exportHeadlinesBtn">
+                                        <i class="fas fa-align-left me-2"></i>
+                                        ملف Word مع العناوين والملخصات (كما في صفحة العناوين)
+                                    </button>
+                                    <button type="button" class="list-group-item list-group-item-action" id="exportHeadlineOnlyBtn">
+                                        <i class="fas fa-align-justify me-2"></i>
+                                        ملف Word يحتوي على العناوين متبوعة بالمحتوى الكامل (بدون ملخص)
+                                    </button>
+                                    <button type="button" class="list-group-item list-group-item-action" id="exportWithImagesBtn">
+                                        <i class="fas fa-image me-2"></i>
+                                        ملف Word يشمل الصور مع المحتوى الكامل لكل مقال
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div id="exportStatus" class="alert alert-info" style="display:none;"></div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h3 class="card-title mb-4">
+                            <i class="fas fa-download me-2 text-success"></i>
+                            تنزيل الصور
+                        </h3>
+                        <form id="imageDownloadForm" class="row g-3">
+                            <div class="col-md-6">
+                                <label for="imageDate" class="form-label">التاريخ (اختياري)</label>
+                                <input type="date" class="form-control" id="imageDate">
+                                <div class="form-text">اتركه فارغاً لتحميل جميع الصور</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="imageLimit" class="form-label">حد أقصى للصور (اختياري)</label>
+                                <input type="number" class="form-control" id="imageLimit" min="1" step="1">
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="forceDownload">
+                                    <label class="form-check-label" for="forceDownload">
+                                        إعادة تحميل الصور حتى لو كانت موجودة (Force)
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-success">
+                                    <i class="fas fa-cloud-download-alt me-2"></i>
+                                    بدء تنزيل الصور
+                                </button>
+                            </div>
+                            <div class="col-12">
+                                <div id="downloadStatus" class="alert" style="display:none;"></div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const exportStatus = document.getElementById('exportStatus');
+const exportDateInput = document.getElementById('exportDate');
+const exportHeadlinesBtn = document.getElementById('exportHeadlinesBtn');
+const exportHeadlineOnlyBtn = document.getElementById('exportHeadlineOnlyBtn');
+const exportWithImagesBtn = document.getElementById('exportWithImagesBtn');
+
+const downloadStatus = document.getElementById('downloadStatus');
+const imageDownloadForm = document.getElementById('imageDownloadForm');
+const imageDateInput = document.getElementById('imageDate');
+const imageLimitInput = document.getElementById('imageLimit');
+const forceDownloadCheck = document.getElementById('forceDownload');
+
+const showExportMessage = (message, type = 'info') => {
+    exportStatus.className = `alert alert-${type}`;
+    exportStatus.textContent = message;
+    exportStatus.style.display = 'block';
+};
+
+const showDownloadMessage = (message, type = 'info') => {
+    downloadStatus.className = `alert alert-${type}`;
+    downloadStatus.textContent = message;
+    downloadStatus.style.display = 'block';
+};
+
+const triggerDownload = (url) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = '';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+};
+
+exportHeadlinesBtn.addEventListener('click', () => {
+    const date = exportDateInput.value;
+    if (!date) {
+        showExportMessage('يرجى تحديد التاريخ أولاً.', 'warning');
+        return;
+    }
+    showExportMessage('جاري تجهيز الملف...');
+    const url = `/api/export/word?date=${encodeURIComponent(date)}&include_content=false`;
+    triggerDownload(url);
+    setTimeout(() => {
+        showExportMessage('تم إرسال الملف للتنزيل. إذا لم يبدأ التنزيل، تحقق من إعدادات المتصفح.', 'success');
+    }, 500);
+});
+
+exportHeadlineOnlyBtn.addEventListener('click', () => {
+    const date = exportDateInput.value;
+    if (!date) {
+        showExportMessage('يرجى تحديد التاريخ أولاً.', 'warning');
+        return;
+    }
+    showExportMessage('جاري إنشاء الملف...');
+    fetch(`/api/export/headline-only?date=${encodeURIComponent(date)}`)
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => { throw new Error(data.error || 'حدث خطأ.'); });
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            const downloadUrl = URL.createObjectURL(blob);
+            triggerDownload(downloadUrl);
+            URL.revokeObjectURL(downloadUrl);
+            showExportMessage('تم إنشاء الملف بنجاح، جاري التنزيل...', 'success');
+        })
+        .catch(error => {
+            showExportMessage(error.message, 'danger');
+        });
+});
+
+exportWithImagesBtn.addEventListener('click', () => {
+    const date = exportDateInput.value;
+    if (!date) {
+        showExportMessage('يرجى تحديد التاريخ أولاً.', 'warning');
+        return;
+    }
+    showExportMessage('جاري إنشاء الملف بالصور...');
+    fetch(`/api/export/word-with-images?date=${encodeURIComponent(date)}&include_content=true`)
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(data => { throw new Error(data.error || 'حدث خطأ.'); });
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            const downloadUrl = URL.createObjectURL(blob);
+            triggerDownload(downloadUrl);
+            URL.revokeObjectURL(downloadUrl);
+            showExportMessage('تم إنشاء الملف مع الصور بنجاح، جاري التنزيل...', 'success');
+        })
+        .catch(error => {
+            showExportMessage(error.message, 'danger');
+        });
+});
+
+imageDownloadForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    showDownloadMessage('جاري تنزيل الصور ... يرجى الانتظار.', 'info');
+
+    const payload = {
+        date: imageDateInput.value || null,
+        limit: imageLimitInput.value ? Number(imageLimitInput.value) : null,
+        force: forceDownloadCheck.checked
+    };
+
+    fetch('/api/tools/download-images', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (!data.success) {
+            throw new Error(data.error || 'حدث خطأ أثناء تنزيل الصور.');
+        }
+        const parts = [
+            `تم طلب ${data.requested} صورة تحتوي على روابط.`,
+            `تم تنزيل ${data.downloaded} صورة جديدة.`,
+            `تم تخطي ${data.skipped} صور موجودة مسبقًا.`,
+            `أخطاء أثناء التحميل: ${data.errors}.`,
+            `المجلد: ${data.output_dir}`
+        ];
+        showDownloadMessage(parts.join('\n'), 'success');
+    })
+    .catch(error => {
+        showDownloadMessage(error.message, 'danger');
+    });
+});
+</script>
+{% endblock %}

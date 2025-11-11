@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block title %}معرض الصور - أرشيف أخبار فلسطين{% endblock %}
+
+{% block content %}
+<section class="py-4 bg-primary text-white">
+    <div class="container">
+        <div class="row">
+            <div class="col-12 text-center">
+                <h1 class="mb-2">
+                    <i class="fas fa-images me-2"></i>
+                    معرض الصور الإخباري
+                </h1>
+                <p class="mb-0">استعرض المقالات التي تحتوي على صور واكتشف أبرز اللقطات اليومية</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="py-4">
+    <div class="container">
+        <div class="filter-section">
+            <form id="imagesFilterForm" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label for="dateInput" class="form-label">التاريخ (اختياري)</label>
+                    <input type="date" class="form-control" id="dateInput">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">عدد النتائج في الصفحة</label>
+                    <select class="form-select" id="perPageSelect">
+                        <option value="12">12</option>
+                        <option value="24" selected>24</option>
+                        <option value="36">36</option>
+                        <option value="48">48</option>
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary flex-grow-1">
+                        <i class="fas fa-search me-2"></i>عرض النتائج
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" id="resetFilters">
+                        <i class="fas fa-undo me-2"></i>إعادة التعيين
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div id="imagesInfo" class="mb-3 text-muted small" style="display:none;"></div>
+
+        <div id="loadingIndicator" class="loading" style="display:none;">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">جاري التحميل...</span>
+            </div>
+            <p class="mt-3">جاري تحميل الصور...</p>
+        </div>
+
+        <div id="noResults" class="alert alert-info text-center" style="display:none;">
+            <i class="fas fa-info-circle me-2"></i>
+            لا توجد مقالات تحتوي على صور في هذا التاريخ.
+        </div>
+
+        <div class="row g-4" id="imagesGrid"></div>
+
+        <nav id="paginationNav" style="display:none;" class="mt-4">
+            <ul class="pagination" id="paginationList"></ul>
+        </nav>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 1;
+let totalPages = 1;
+let currentDate = '';
+let currentPerPage = 24;
+
+const imagesGrid = document.getElementById('imagesGrid');
+const loadingIndicator = document.getElementById('loadingIndicator');
+const noResults = document.getElementById('noResults');
+const paginationNav = document.getElementById('paginationNav');
+const paginationList = document.getElementById('paginationList');
+const infoBox = document.getElementById('imagesInfo');
+
+function formatDate(dateString) {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ar-SA', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+}
+
+function createImageCard(article) {
+    const col = document.createElement('div');
+    col.className = 'col-lg-3 col-md-4 col-sm-6';
+    col.innerHTML = `
+        <div class="card h-100 shadow-sm border-0">
+            <div class="position-relative">
+                <img src="${article.image_url}" class="img-fluid" alt="${article.title}"
+                     loading="lazy" style="width: 100%; height: 200px; object-fit: cover;">
+                <span class="badge bg-dark position-absolute top-0 end-0 m-2">
+                    ${formatDate(article.date)}
+                </span>
+            </div>
+            <div class="card-body d-flex flex-column">
+                <h6 class="card-title">${article.title}</h6>
+                ${article.excerpt ? `<p class="text-muted small">${article.excerpt.substring(0, 120)}...</p>` : ''}
+                <div class="mt-auto d-flex gap-2">
+                    <a href="/article/${article.id}" class="btn btn-sm btn-outline-primary flex-grow-1">
+                        <i class="fas fa-eye me-1"></i>عرض التفاصيل
+                    </a>
+                    <a href="${article.image_url}" target="_blank" class="btn btn-sm btn-outline-secondary" title="فتح الصورة">
+                        <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    `;
+    return col;
+}
+
+function updatePagination(page, total) {
+    currentPage = page;
+    totalPages = total;
+
+    if (totalPages <= 1) {
+        paginationNav.style.display = 'none';
+        return;
+    }
+
+    paginationNav.style.display = 'block';
+    paginationList.innerHTML = '';
+
+    const createPageItem = (label, targetPage, disabled = false, active = false) => {
+        const li = document.createElement('li');
+        li.className = `page-item ${disabled ? 'disabled' : ''} ${active ? 'active' : ''}`;
+        const a = document.createElement('a');
+        a.className = 'page-link';
+        a.href = '#';
+        a.textContent = label;
+        a.addEventListener('click', (event) => {
+            event.preventDefault();
+            if (!disabled && !active) {
+                loadImages(targetPage);
+            }
+        });
+        li.appendChild(a);
+        return li;
+    };
+
+    // Previous
+    paginationList.appendChild(createPageItem('«', page - 1, page === 1));
+
+    const windowSize = 3;
+    const start = Math.max(1, page - windowSize);
+    const end = Math.min(totalPages, page + windowSize);
+
+    for (let p = start; p <= end; p++) {
+        paginationList.appendChild(createPageItem(p, p, false, p === page));
+    }
+
+    // Next
+    paginationList.appendChild(createPageItem('»', page + 1, page === totalPages));
+}
+
+function loadImages(page = 1) {
+    loadingIndicator.style.display = 'block';
+    noResults.style.display = 'none';
+    paginationNav.style.display = 'none';
+    infoBox.style.display = 'none';
+    imagesGrid.innerHTML = '';
+
+    const params = new URLSearchParams({
+        page: page,
+        per_page: currentPerPage
+    });
+
+    if (currentDate) {
+        params.append('date', currentDate);
+    }
+
+    fetch(`/api/images?${params.toString()}`)
+        .then(response => response.json())
+        .then(data => {
+            loadingIndicator.style.display = 'none';
+
+            if (!data.articles || data.articles.length === 0) {
+                noResults.style.display = 'block';
+                return;
+            }
+
+            infoBox.style.display = 'block';
+            infoBox.textContent = `تم عرض ${data.articles.length} من أصل ${data.total.toLocaleString()} مقال يحتوي على صور.`;
+
+            data.articles.forEach(article => {
+                imagesGrid.appendChild(createImageCard(article));
+            });
+
+            updatePagination(data.page, data.total_pages);
+        })
+        .catch(error => {
+            loadingIndicator.style.display = 'none';
+            noResults.style.display = 'block';
+            noResults.textContent = 'حدث خطأ أثناء تحميل الصور. يرجى المحاولة مرة أخرى.';
+            console.error('Error loading images:', error);
+        });
+}
+
+// Form handling
+const filterForm = document.getElementById('imagesFilterForm');
+const dateInput = document.getElementById('dateInput');
+const perPageSelect = document.getElementById('perPageSelect');
+const resetButton = document.getElementById('resetFilters');
+
+filterForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    currentDate = dateInput.value;
+    currentPerPage = parseInt(perPageSelect.value, 10);
+    loadImages(1);
+});
+
+resetButton.addEventListener('click', () => {
+    dateInput.value = '';
+    perPageSelect.value = '24';
+    currentDate = '';
+    currentPerPage = 24;
+    loadImages(1);
+});
+
+// Initial load
+document.addEventListener('DOMContentLoaded', () => {
+    loadImages();
+});
+</script>
+{% endblock %}
