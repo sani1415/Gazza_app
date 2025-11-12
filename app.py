@@ -715,6 +715,9 @@ def create_document_with_images(date: str, include_content: bool = True) -> Tupl
     title = doc.add_heading(f'أخبار فلسطين - {analyzer.format_date_arabic(date)}', 0)
     title.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
+    # Track image files to clean up after document creation
+    used_image_paths = []
+
     for idx, article in enumerate(articles, start=1):
         heading = doc.add_heading(article.get('title', 'بدون عنوان'), level=1)
         heading.alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -728,6 +731,8 @@ def create_document_with_images(date: str, include_content: bool = True) -> Tupl
                 else:
                     doc.add_picture(str(image_path), width=Inches(5.5))
                 doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                # Track this image for cleanup
+                used_image_paths.append(image_path)
             except Exception as exc:
                 print(f"Failed to insert image {image_path}: {exc}")
 
@@ -764,9 +769,19 @@ def create_document_with_images(date: str, include_content: bool = True) -> Tupl
     footer = doc.add_paragraph(f'تم إنشاء هذا التقرير في: {datetime.now().strftime("%Y-%m-%d %H:%M")}')
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
  
-    filename = f"palestine_news_with_images_{date.replace('-', '_')}_{int(time.time())}.docx"
+    # Use simpler filename format (matching other exports)
+    filename = f"palestine_news_with_images_{date.replace('-', '_')}.docx"
     filepath = TEMP_DIR / filename
     doc.save(filepath)
+
+    # Clean up cached images after embedding (Option 2)
+    for image_path in used_image_paths:
+        try:
+            if image_path.exists():
+                image_path.unlink()
+                print(f"Cleaned up cached image: {image_path}")
+        except Exception as exc:
+            print(f"Failed to delete cached image {image_path}: {exc}")
 
     return filepath, filename
 
