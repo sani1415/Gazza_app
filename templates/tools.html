@@ -57,6 +57,40 @@
                 </div>
             </div>
 
+            <!-- Progress Modal -->
+            <div class="modal fade" id="progressModal" tabindex="-1" aria-labelledby="progressModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="progressModalLabel">
+                                <i class="fas fa-spinner fa-spin me-2"></i>
+                                جاري إنشاء الملف...
+                            </h5>
+                        </div>
+                        <div class="modal-body">
+                            <div class="mb-3">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span id="progressPercentage" class="fw-bold">0%</span>
+                                    <span id="progressStatus" class="text-muted">بدء العملية...</span>
+                                </div>
+                                <div class="progress" style="height: 30px;">
+                                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                                         role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                        0%
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="progressMessage" class="text-center text-muted small">
+                                جاري التجهيز...
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" id="cancelProgressBtn" style="display:none;">إلغاء</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="col-lg-6">
                 <div class="card h-100">
                     <div class="card-body">
@@ -135,68 +169,148 @@ const triggerDownload = (url) => {
     document.body.removeChild(link);
 };
 
-exportHeadlinesBtn.addEventListener('click', () => {
+// Reusable function for progress tracking
+function startExportWithProgress(startEndpoint, progressEndpoint, successMessage, includeContent = false) {
     const date = exportDateInput.value;
     if (!date) {
         showExportMessage('يرجى تحديد التاريخ أولاً.', 'warning');
         return;
     }
-    showExportMessage('جاري تجهيز الملف...');
-    const url = `/api/export/word?date=${encodeURIComponent(date)}&include_content=false`;
-    triggerDownload(url);
-    setTimeout(() => {
-        showExportMessage('تم إرسال الملف للتنزيل. إذا لم يبدأ التنزيل، تحقق من إعدادات المتصفح.', 'success');
-    }, 500);
+
+    // Show progress modal
+    const progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
+    const progressBar = document.getElementById('progressBar');
+    const progressPercentage = document.getElementById('progressPercentage');
+    const progressMessage = document.getElementById('progressMessage');
+    const progressStatus = document.getElementById('progressStatus');
+    const cancelBtn = document.getElementById('cancelProgressBtn');
+    
+    let eventSource = null;
+    let jobId = null;
+
+    // Reset progress
+    progressBar.style.width = '0%';
+    progressBar.textContent = '0%';
+    progressBar.setAttribute('aria-valuenow', '0');
+    progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+    progressPercentage.textContent = '0%';
+    progressMessage.textContent = 'جاري التجهيز...';
+    progressStatus.textContent = 'بدء العملية...';
+    cancelBtn.style.display = 'none';
+
+    // Start the job
+    fetch(startEndpoint, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            date: date,
+            include_content: includeContent
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        jobId = data.job_id;
+        
+        // Show modal
+        progressModal.show();
+        
+        // Connect to SSE
+        eventSource = new EventSource(`${progressEndpoint}/${jobId}`);
+        
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            const percentage = data.percentage || 0;
+            const message = data.message || '';
+            const status = data.status || 'processing';
+            
+            // Update progress bar
+            progressBar.style.width = `${percentage}%`;
+            progressBar.textContent = `${percentage}%`;
+            progressBar.setAttribute('aria-valuenow', percentage);
+            progressPercentage.textContent = `${percentage}%`;
+            progressMessage.textContent = message;
+            progressStatus.textContent = `${percentage}%`;
+            
+            if (status === 'completed') {
+                progressBar.classList.remove('progress-bar-animated');
+                progressBar.classList.add('bg-success');
+                progressStatus.textContent = 'اكتمل!';
+                progressMessage.textContent = 'تم إنشاء الملف بنجاح! جاري التنزيل...';
+                
+                // Close modal and trigger download
+                setTimeout(() => {
+                    progressModal.hide();
+                    eventSource.close();
+                    
+                    if (data.download_url) {
+                        triggerDownload(data.download_url);
+                        showExportMessage(successMessage, 'success');
+                    }
+                }, 1000);
+            } else if (status === 'error') {
+                progressBar.classList.remove('progress-bar-animated');
+                progressBar.classList.add('bg-danger');
+                progressStatus.textContent = 'خطأ!';
+                progressMessage.textContent = data.error || 'حدث خطأ أثناء إنشاء الملف';
+                cancelBtn.style.display = 'block';
+                cancelBtn.textContent = 'إغلاق';
+                cancelBtn.onclick = () => {
+                    progressModal.hide();
+                    eventSource.close();
+                };
+                showExportMessage(data.error || 'حدث خطأ أثناء إنشاء الملف', 'danger');
+            }
+        };
+        
+        eventSource.onerror = (error) => {
+            console.error('SSE error:', error);
+            progressBar.classList.remove('progress-bar-animated');
+            progressBar.classList.add('bg-danger');
+            progressStatus.textContent = 'خطأ في الاتصال!';
+            progressMessage.textContent = 'حدث خطأ في الاتصال بالخادم';
+            cancelBtn.style.display = 'block';
+            cancelBtn.textContent = 'إغلاق';
+            cancelBtn.onclick = () => {
+                progressModal.hide();
+                if (eventSource) eventSource.close();
+            };
+            showExportMessage('حدث خطأ في الاتصال بالخادم', 'danger');
+        };
+    })
+    .catch(error => {
+        showExportMessage(error.message, 'danger');
+        if (eventSource) eventSource.close();
+    });
+}
+
+exportHeadlinesBtn.addEventListener('click', () => {
+    startExportWithProgress(
+        '/api/export/word/start',
+        '/api/export/word/progress',
+        'تم إنشاء الملف مع العناوين والملخصات بنجاح، جاري التنزيل...'
+    );
 });
 
 exportHeadlineOnlyBtn.addEventListener('click', () => {
-    const date = exportDateInput.value;
-    if (!date) {
-        showExportMessage('يرجى تحديد التاريخ أولاً.', 'warning');
-        return;
-    }
-    showExportMessage('جاري إنشاء الملف...');
-    fetch(`/api/export/headline-only?date=${encodeURIComponent(date)}`)
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(data => { throw new Error(data.error || 'حدث خطأ.'); });
-            }
-            return response.blob();
-        })
-        .then(blob => {
-            const downloadUrl = URL.createObjectURL(blob);
-            triggerDownload(downloadUrl);
-            URL.revokeObjectURL(downloadUrl);
-            showExportMessage('تم إنشاء الملف بنجاح، جاري التنزيل...', 'success');
-        })
-        .catch(error => {
-            showExportMessage(error.message, 'danger');
-        });
+    startExportWithProgress(
+        '/api/export/headline-only/start',
+        '/api/export/headline-only/progress',
+        'تم إنشاء الملف بنجاح، جاري التنزيل...'
+    );
 });
 
 exportWithImagesBtn.addEventListener('click', () => {
-    const date = exportDateInput.value;
-    if (!date) {
-        showExportMessage('يرجى تحديد التاريخ أولاً.', 'warning');
-        return;
-    }
-    showExportMessage('جاري إنشاء الملف بالصور...');
-    fetch(`/api/export/word-with-images?date=${encodeURIComponent(date)}&include_content=true`)
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(data => { throw new Error(data.error || 'حدث خطأ.'); });
-            }
-            return response.blob();
-        })
-        .then(blob => {
-            const downloadUrl = URL.createObjectURL(blob);
-            triggerDownload(downloadUrl);
-            URL.revokeObjectURL(downloadUrl);
-            showExportMessage('تم إنشاء الملف مع الصور بنجاح، جاري التنزيل...', 'success');
-        })
-        .catch(error => {
-            showExportMessage(error.message, 'danger');
-        });
+    startExportWithProgress(
+        '/api/export/word-with-images/start',
+        '/api/export/word-with-images/progress',
+        'تم إنشاء الملف مع الصور بنجاح، جاري التنزيل...',
+        true  // include_content = true
+    );
 });
 
 imageDownloadForm.addEventListener('submit', (event) => {

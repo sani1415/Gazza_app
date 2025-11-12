@@ -22,3 +22,7 @@ Thumbs.db
 *.log
 *.tmp
 
+# Application generated folders
+temp/
+images_cache/
+

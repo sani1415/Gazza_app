@@ -9,6 +9,8 @@ import io
 import json
 import re
 import time
+import threading
+import uuid
 from datetime import datetime, timedelta
 from collections import Counter, defaultdict
 import os
@@ -17,10 +19,10 @@ from docx import Document
 from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.shared import OxmlElement, qn
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, Response, stream_with_context
 from pathlib import Path
-from urllib.parse import urlparse, unquote
-from typing import Optional, Tuple
+from urllib.parse import urlparse, unquote, quote
+from typing import Optional, Tuple, Callable
 
 from PIL import Image
 from bs4 import BeautifulSoup
@@ -49,6 +51,10 @@ def getTypeLabel(article_type):
 IMAGES_CACHE_DIR = Path("images_cache")
 TEMP_DIR = Path("temp")
 TEMP_DIR.mkdir(exist_ok=True)
+
+# Progress tracking for document creation
+progress_tracker = {}
+progress_lock = threading.Lock()
 
 class NewsAnalyzer:
     def __init__(self, json_file_path):
@@ -219,13 +225,25 @@ class NewsAnalyzer:
             print(f"Error parsing article content: {e}")
             return "عذراً، حدث خطأ في معالجة محتوى المقال."
     
-    def create_word_document(self, articles, date, include_content=False):
+    def create_word_document(self, articles, date, include_content=False, progress_callback: Optional[Callable] = None):
         """Create a Word document with articles from a specific date"""
         doc = Document()
         
         # Set document direction to RTL
         doc.styles['Normal'].font.name = 'Arial'
         doc.styles['Normal'].font.size = Inches(0.12)
+        
+        total_steps = len(articles) * (2 if include_content else 1) + 3  # per article + init + summary + save
+        current_step = 0
+        
+        def update_progress(step_increment, message, status="processing"):
+            nonlocal current_step
+            current_step += step_increment
+            percentage = int((current_step / total_steps) * 100) if total_steps > 0 else 0
+            if progress_callback:
+                progress_callback(percentage, message, status)
+        
+        update_progress(1, f"بدء إنشاء المستند ({len(articles)} مقال)", "processing")
         
         # Add title
         title = doc.add_heading(f'أخبار فلسطين - {self.format_date_arabic(date)}', 0)
@@ -238,8 +256,12 @@ class NewsAnalyzer:
         # Add separator
         doc.add_paragraph('=' * 50)
         
+        update_progress(1, "إضافة العناوين والملخصات...", "processing")
+        
         # Add articles
         for i, article in enumerate(articles, 1):
+            update_progress(0, f"معالجة المقال {i} من {len(articles)}: {article.get('title', 'بدون عنوان')[:50]}...", "processing")
+            
             # Article number and title
             article_heading = doc.add_heading(f'{i}. {article.get("title", "بدون عنوان")}', level=1)
             article_heading.alignment = WD_ALIGN_PARAGRAPH.RIGHT
@@ -261,6 +283,7 @@ class NewsAnalyzer:
             
             # Full content if requested
             if include_content and article.get('link'):
+                update_progress(0, f"جاري جلب محتوى المقال {i}...", "processing")
                 content_heading = doc.add_heading('المحتوى الكامل:', level=2)
                 content_heading.alignment = WD_ALIGN_PARAGRAPH.RIGHT
                 
@@ -279,6 +302,9 @@ class NewsAnalyzer:
                 except Exception as e:
                     error_para = doc.add_paragraph(f'خطأ في تحميل المحتوى: {str(e)}')
                     error_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                update_progress(1, f"تمت إضافة محتوى المقال {i}", "processing")
+            else:
+                update_progress(1, f"اكتمل المقال {i}", "processing")
             
             # Article link (only show if not including full content)
             if not include_content:
@@ -292,10 +318,14 @@ class NewsAnalyzer:
                 doc.add_paragraph('-' * 50)
                 doc.add_paragraph()  # Empty line
         
+        update_progress(1, "جاري حفظ الملف...", "processing")
+        
         # Add footer
         doc.add_paragraph()
         footer = doc.add_paragraph(f'تم إنشاء هذا التقرير في: {datetime.now().strftime("%Y-%m-%d %H:%M")}')
         footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        update_progress(1, "اكتمل إنشاء الملف بنجاح!", "completed")
         
         return doc
     
@@ -649,53 +679,84 @@ def download_images(date=None, limit=None, force=False):
     }
 
 
-def create_headline_only_document(date):
+def create_headline_only_document(date, progress_callback: Optional[Callable] = None):
+    """Create document with headlines and full content (same format as with images, but without images)"""
     articles = [
         article for article in analyzer.articles
         if article.get('date') == date
     ]
 
     if not articles:
+        if progress_callback:
+            progress_callback(0, "لم يتم العثور على مقالات", "error")
         return None, None
+
+    total_steps = len(articles) * 2 + 2  # per article: content fetch + formatting (2 steps) + init + save
+    current_step = 0
+
+    def update_progress(step_increment, message, status="processing"):
+        nonlocal current_step
+        current_step += step_increment
+        percentage = int((current_step / total_steps) * 100) if total_steps > 0 else 0
+        if progress_callback:
+            progress_callback(percentage, message, status)
 
     doc = Document()
     doc.styles['Normal'].font.name = 'Arial'
     doc.styles['Normal'].font.size = Inches(0.12)
 
+    update_progress(1, f"بدء إنشاء المستند ({len(articles)} مقال)", "processing")
+    
     title = doc.add_heading(f'أخبار فلسطين - {analyzer.format_date_arabic(date)}', 0)
     title.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
-    for article in articles:
+    for idx, article in enumerate(articles, start=1):
+        update_progress(0, f"معالجة المقال {idx} من {len(articles)}: {article.get('title', 'بدون عنوان')[:50]}...", "processing")
+        
         heading = doc.add_heading(article.get('title', 'بدون عنوان'), level=1)
         heading.alignment = WD_ALIGN_PARAGRAPH.RIGHT
 
-        link_para = doc.add_paragraph()
-        link_para.add_run('رابط المقال: ').bold = True
-        link_para.add_run(article.get('link', 'غير متوفر'))
-        link_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        # Add link (same format as with images - decoded URL, no label)
+        if article.get('link'):
+            cleaned_url = unquote(article['link'])
+            link_para = doc.add_paragraph()
+            link_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            run = link_para.add_run(cleaned_url)
+            run.font.size = Inches(0.11)
 
-        content = analyzer.fetch_article_content(article.get('link')) if article.get('link') else ''
-        if content and not content.startswith('عذراً'):
-            for paragraph in content.split('\n'):
-                paragraph = paragraph.strip()
-                if paragraph:
-                    para = doc.add_paragraph(paragraph)
-                    para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                    para.paragraph_format.keep_together = True
-        else:
-            missing_para = doc.add_paragraph('تعذر تحميل المحتوى الكامل للمقال.')
-            missing_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        # Fetch and add content (using the same formatted function as with images)
+        content_text = ''
+        update_progress(0, f"جاري جلب محتوى المقال {idx}...", "processing")
+        content_text = fetch_article_content_formatted(article)
+        if not content_text and article.get('excerpt'):
+            content_text = article.get('excerpt')
 
-        doc.add_paragraph('-' * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
-        doc.add_paragraph()
+        if not content_text:
+            content_text = 'عذراً، تعذر تحميل المحتوى الكامل للمقال.'
 
+        for paragraph in content_text.split('\n'):
+            cleaned = paragraph.strip()
+            if not cleaned:
+                continue
+            para = doc.add_paragraph(cleaned)
+            para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            para.paragraph_format.keep_together = True
+
+        update_progress(1, f"تمت إضافة محتوى المقال {idx}", "processing")
+
+        if idx != len(articles):
+            doc.add_paragraph('-' * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
+            doc.add_paragraph()
+ 
+    update_progress(1, "جاري حفظ الملف...", "processing")
     footer = doc.add_paragraph(f'تم إنشاء هذا التقرير في: {datetime.now().strftime("%Y-%m-%d %H:%M")}')
     footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    filename = f"palestine_news_headline_only_{date.replace('-', '_')}_{int(time.time())}.docx"
+    filename = f"palestine_news_full_content_{date.replace('-', '_')}.docx"
     filepath = TEMP_DIR / filename
     doc.save(filepath)
 
+    update_progress(1, "اكتمل إنشاء الملف بنجاح!", "completed")
     return filepath, filename
 
 
@@ -786,6 +847,120 @@ def create_document_with_images(date: str, include_content: bool = True) -> Tupl
     return filepath, filename
 
 
+def create_document_with_images_progress(date: str, include_content: bool = True, progress_callback: Optional[Callable] = None) -> Tuple[Optional[Path], Optional[str]]:
+    """Create document with images, reporting progress via callback"""
+    articles = [
+        article for article in analyzer.articles
+        if article.get('date') == date
+    ]
+
+    if not articles:
+        if progress_callback:
+            progress_callback(0, "لم يتم العثور على مقالات", "error")
+        return None, None
+
+    total_steps = len(articles) * 3 + 3  # per article: image, content, formatting (3 steps) + init (1) + save (1) + cleanup (1)
+    current_step = 0
+
+    def update_progress(step_increment, message, status="processing"):
+        nonlocal current_step
+        current_step += step_increment
+        percentage = int((current_step / total_steps) * 100)
+        if progress_callback:
+            progress_callback(percentage, message, status)
+
+    doc = Document()
+    doc.styles['Normal'].font.name = 'Arial'
+    doc.styles['Normal'].font.size = Inches(0.12)
+
+    update_progress(1, f"بدء إنشاء المستند ({len(articles)} مقال)", "processing")
+    
+    title = doc.add_heading(f'أخبار فلسطين - {analyzer.format_date_arabic(date)}', 0)
+    title.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    # Track image files to clean up after document creation
+    used_image_paths = []
+
+    for idx, article in enumerate(articles, start=1):
+        update_progress(0, f"معالجة المقال {idx} من {len(articles)}: {article.get('title', 'بدون عنوان')[:50]}...", "processing")
+        
+        heading = doc.add_heading(article.get('title', 'بدون عنوان'), level=1)
+        heading.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+        # Download and process image
+        image_path = ensure_image_file(article)
+        if image_path and image_path.exists():
+            try:
+                update_progress(0, f"إضافة صورة للمقال {idx}...", "processing")
+                resized_stream = prepare_image_stream(image_path)
+                if resized_stream:
+                    doc.add_picture(resized_stream, width=Inches(5.5))
+                else:
+                    doc.add_picture(str(image_path), width=Inches(5.5))
+                doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                used_image_paths.append(image_path)
+            except Exception as exc:
+                print(f"Failed to insert image {image_path}: {exc}")
+        update_progress(1, f"تمت إضافة صورة المقال {idx}", "processing")
+
+        # Add link
+        if article.get('link'):
+            cleaned_url = unquote(article['link'])
+            link_para = doc.add_paragraph()
+            link_para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            run = link_para.add_run(cleaned_url)
+            run.font.size = Inches(0.11)
+
+        # Fetch and add content
+        content_text = ''
+        if include_content:
+            update_progress(0, f"جاري جلب محتوى المقال {idx}...", "processing")
+            content_text = fetch_article_content_formatted(article)
+            if not content_text and article.get('excerpt'):
+                content_text = article.get('excerpt')
+        else:
+            content_text = article.get('excerpt') or ''
+
+        if not content_text:
+            content_text = 'عذراً، تعذر تحميل المحتوى الكامل للمقال.'
+
+        update_progress(1, f"إضافة محتوى المقال {idx}...", "processing")
+        for paragraph in content_text.split('\n'):
+            cleaned = paragraph.strip()
+            if not cleaned:
+                continue
+            para = doc.add_paragraph(cleaned)
+            para.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            para.paragraph_format.keep_together = True
+
+        if idx != len(articles):
+            doc.add_paragraph('-' * 50).alignment = WD_ALIGN_PARAGRAPH.CENTER
+            doc.add_paragraph()
+        
+        update_progress(1, f"اكتمل المقال {idx}", "processing")
+ 
+    update_progress(1, "جاري حفظ الملف...", "processing")
+    footer = doc.add_paragraph(f'تم إنشاء هذا التقرير في: {datetime.now().strftime("%Y-%m-%d %H:%M")}')
+    footer.alignment = WD_ALIGN_PARAGRAPH.CENTER
+ 
+    # Use simpler filename format (matching other exports)
+    filename = f"palestine_news_with_images_{date.replace('-', '_')}.docx"
+    filepath = TEMP_DIR / filename
+    doc.save(filepath)
+
+    # Clean up cached images after embedding (Option 2)
+    update_progress(0, "جاري تنظيف الصور المؤقتة...", "processing")
+    for image_path in used_image_paths:
+        try:
+            if image_path.exists():
+                image_path.unlink()
+        except Exception as exc:
+            print(f"Failed to delete cached image {image_path}: {exc}")
+    
+    update_progress(1, "اكتمل إنشاء الملف بنجاح!", "completed")
+    return filepath, filename
+
+
 @app.route('/api/export/headline-only')
 def api_export_headline_only():
     date = request.args.get('date', '').strip()
@@ -814,7 +989,457 @@ def api_export_with_images():
     if not filepath:
         return jsonify({'error': 'No articles found for the specified date'}), 404
 
-    return send_file(filepath, as_attachment=True, download_name=filename)
+    # Convert Path to absolute string path for Flask send_file
+    if isinstance(filepath, Path):
+        filepath_str = str(filepath.resolve())
+    else:
+        filepath_str = os.path.abspath(filepath)
+    
+    # Verify file exists
+    if not os.path.exists(filepath_str):
+        return jsonify({'error': 'Generated file not found'}), 500
+    
+    # Ensure filename is properly encoded for Content-Disposition header
+    try:
+        response = send_file(
+            filepath_str, 
+            as_attachment=True, 
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        
+        # Explicitly set Content-Disposition header to ensure correct filename
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=UTF-8\'\'{quote(filename)}'
+        
+        return response
+    except Exception as e:
+        print(f"Error sending file: {e}")
+        return jsonify({'error': f'Failed to send file: {str(e)}'}), 500
+
+
+@app.route('/api/export/word-with-images/start', methods=['POST'])
+def api_export_with_images_start():
+    """Start document creation job and return job_id"""
+    data = request.get_json()
+    date = data.get('date', '').strip()
+    include_content = data.get('include_content', True)
+
+    if not date:
+        return jsonify({'error': 'Date parameter is required'}), 400
+
+    # Generate unique job ID
+    job_id = str(uuid.uuid4())
+    
+    # Initialize progress
+    with progress_lock:
+        progress_tracker[job_id] = {
+            'percentage': 0,
+            'message': 'بدء العملية...',
+            'status': 'processing',
+            'filepath': None,
+            'filename': None,
+            'error': None
+        }
+
+    # Start document creation in background thread
+    def create_document_thread():
+        def progress_callback(percentage, message, status):
+            with progress_lock:
+                if job_id in progress_tracker:
+                    progress_tracker[job_id]['percentage'] = percentage
+                    progress_tracker[job_id]['message'] = message
+                    progress_tracker[job_id]['status'] = status
+
+        try:
+            filepath, filename = create_document_with_images_progress(
+                date, include_content, progress_callback
+            )
+            with progress_lock:
+                if job_id in progress_tracker:
+                    if filepath:
+                        progress_tracker[job_id]['filepath'] = str(filepath.resolve()) if isinstance(filepath, Path) else filepath
+                        progress_tracker[job_id]['filename'] = filename
+                        progress_tracker[job_id]['status'] = 'completed'
+                        progress_tracker[job_id]['percentage'] = 100
+                        progress_tracker[job_id]['message'] = 'اكتمل إنشاء الملف بنجاح!'
+                    else:
+                        progress_tracker[job_id]['status'] = 'error'
+                        progress_tracker[job_id]['error'] = 'لم يتم العثور على مقالات'
+        except Exception as e:
+            with progress_lock:
+                if job_id in progress_tracker:
+                    progress_tracker[job_id]['status'] = 'error'
+                    progress_tracker[job_id]['error'] = str(e)
+                    progress_tracker[job_id]['message'] = f'حدث خطأ: {str(e)}'
+
+    thread = threading.Thread(target=create_document_thread)
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({'job_id': job_id})
+
+
+@app.route('/api/export/word-with-images/progress/<job_id>')
+def api_export_with_images_progress(job_id):
+    """SSE endpoint for streaming progress updates"""
+    def generate():
+        last_percentage = -1
+        while True:
+            with progress_lock:
+                progress = progress_tracker.get(job_id, {})
+                percentage = progress.get('percentage', 0)
+                message = progress.get('message', '')
+                status = progress.get('status', 'processing')
+                filepath = progress.get('filepath')
+                filename = progress.get('filename')
+                error = progress.get('error')
+
+            # Only send update if percentage changed or status changed
+            if percentage != last_percentage or status in ['completed', 'error']:
+                data = {
+                    'percentage': percentage,
+                    'message': message,
+                    'status': status
+                }
+                
+                if status == 'completed' and filepath and filename:
+                    data['filepath'] = filepath
+                    data['filename'] = filename
+                    data['download_url'] = f'/api/export/word-with-images/download/{job_id}'
+                
+                if status == 'error' and error:
+                    data['error'] = error
+
+                yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                last_percentage = percentage
+
+                if status in ['completed', 'error']:
+                    # Clean up after a delay
+                    time.sleep(2)
+                    with progress_lock:
+                        if job_id in progress_tracker:
+                            del progress_tracker[job_id]
+                    break
+
+            time.sleep(0.5)  # Update every 500ms
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive'
+        }
+    )
+
+
+@app.route('/api/export/word-with-images/download/<job_id>')
+def api_export_with_images_download(job_id):
+    """Download the completed document"""
+    with progress_lock:
+        progress = progress_tracker.get(job_id, {})
+        filepath = progress.get('filepath')
+        filename = progress.get('filename')
+
+    if not filepath or not filename:
+        return jsonify({'error': 'File not found or job not completed'}), 404
+
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'Generated file not found'}), 404
+
+    try:
+        response = send_file(
+            filepath,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=UTF-8\'\'{quote(filename)}'
+        return response
+    except Exception as e:
+        print(f"Error sending file: {e}")
+        return jsonify({'error': f'Failed to send file: {str(e)}'}), 500
+
+
+@app.route('/api/export/word/start', methods=['POST'])
+def api_export_word_start():
+    """Start document creation job (with summaries) and return job_id"""
+    data = request.get_json()
+    date = data.get('date', '').strip()
+    include_content = data.get('include_content', False)
+
+    if not date:
+        return jsonify({'error': 'Date parameter is required'}), 400
+
+    articles = [a for a in analyzer.articles if a.get('date') == date]
+    if not articles:
+        return jsonify({'error': 'No articles found for the specified date'}), 404
+
+    job_id = str(uuid.uuid4())
+    
+    with progress_lock:
+        progress_tracker[job_id] = {
+            'percentage': 0,
+            'message': 'بدء العملية...',
+            'status': 'processing',
+            'filepath': None,
+            'filename': None,
+            'error': None
+        }
+
+    def create_document_thread():
+        def progress_callback(percentage, message, status):
+            with progress_lock:
+                if job_id in progress_tracker:
+                    progress_tracker[job_id]['percentage'] = percentage
+                    progress_tracker[job_id]['message'] = message
+                    progress_tracker[job_id]['status'] = status
+
+        try:
+            doc = analyzer.create_word_document(articles, date, include_content, progress_callback)
+            filename = f"palestine_news_with_summaries_{date.replace('-', '_')}.docx"
+            filepath = TEMP_DIR / filename
+            doc.save(filepath)
+            
+            with progress_lock:
+                if job_id in progress_tracker:
+                    progress_tracker[job_id]['filepath'] = str(filepath.resolve())
+                    progress_tracker[job_id]['filename'] = filename
+                    progress_tracker[job_id]['status'] = 'completed'
+                    progress_tracker[job_id]['percentage'] = 100
+                    progress_tracker[job_id]['message'] = 'اكتمل إنشاء الملف بنجاح!'
+        except Exception as e:
+            with progress_lock:
+                if job_id in progress_tracker:
+                    progress_tracker[job_id]['status'] = 'error'
+                    progress_tracker[job_id]['error'] = str(e)
+                    progress_tracker[job_id]['message'] = f'حدث خطأ: {str(e)}'
+
+    thread = threading.Thread(target=create_document_thread)
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({'job_id': job_id})
+
+
+@app.route('/api/export/headline-only/start', methods=['POST'])
+def api_export_headline_only_start():
+    """Start headline-only document creation job and return job_id"""
+    data = request.get_json()
+    date = data.get('date', '').strip()
+
+    if not date:
+        return jsonify({'error': 'Date parameter is required'}), 400
+
+    job_id = str(uuid.uuid4())
+    
+    with progress_lock:
+        progress_tracker[job_id] = {
+            'percentage': 0,
+            'message': 'بدء العملية...',
+            'status': 'processing',
+            'filepath': None,
+            'filename': None,
+            'error': None
+        }
+
+    def create_document_thread():
+        def progress_callback(percentage, message, status):
+            with progress_lock:
+                if job_id in progress_tracker:
+                    progress_tracker[job_id]['percentage'] = percentage
+                    progress_tracker[job_id]['message'] = message
+                    progress_tracker[job_id]['status'] = status
+
+        try:
+            filepath, filename = create_headline_only_document(date, progress_callback)
+            with progress_lock:
+                if job_id in progress_tracker:
+                    if filepath:
+                        progress_tracker[job_id]['filepath'] = str(filepath.resolve()) if isinstance(filepath, Path) else filepath
+                        progress_tracker[job_id]['filename'] = filename
+                        progress_tracker[job_id]['status'] = 'completed'
+                        progress_tracker[job_id]['percentage'] = 100
+                        progress_tracker[job_id]['message'] = 'اكتمل إنشاء الملف بنجاح!'
+                    else:
+                        progress_tracker[job_id]['status'] = 'error'
+                        progress_tracker[job_id]['error'] = 'لم يتم العثور على مقالات'
+        except Exception as e:
+            with progress_lock:
+                if job_id in progress_tracker:
+                    progress_tracker[job_id]['status'] = 'error'
+                    progress_tracker[job_id]['error'] = str(e)
+                    progress_tracker[job_id]['message'] = f'حدث خطأ: {str(e)}'
+
+    thread = threading.Thread(target=create_document_thread)
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({'job_id': job_id})
+
+
+@app.route('/api/export/word/progress/<job_id>')
+def api_export_word_progress(job_id):
+    """SSE endpoint for streaming progress updates (word with summaries)"""
+    def generate():
+        last_percentage = -1
+        while True:
+            with progress_lock:
+                progress = progress_tracker.get(job_id, {})
+                percentage = progress.get('percentage', 0)
+                message = progress.get('message', '')
+                status = progress.get('status', 'processing')
+                filepath = progress.get('filepath')
+                filename = progress.get('filename')
+                error = progress.get('error')
+
+            if percentage != last_percentage or status in ['completed', 'error']:
+                data = {
+                    'percentage': percentage,
+                    'message': message,
+                    'status': status
+                }
+                
+                if status == 'completed' and filepath and filename:
+                    data['filepath'] = filepath
+                    data['filename'] = filename
+                    data['download_url'] = f'/api/export/word/download/{job_id}'
+                
+                if status == 'error' and error:
+                    data['error'] = error
+
+                yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                last_percentage = percentage
+
+                if status in ['completed', 'error']:
+                    time.sleep(2)
+                    with progress_lock:
+                        if job_id in progress_tracker:
+                            del progress_tracker[job_id]
+                    break
+
+            time.sleep(0.5)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive'
+        }
+    )
+
+
+@app.route('/api/export/headline-only/progress/<job_id>')
+def api_export_headline_only_progress(job_id):
+    """SSE endpoint for streaming progress updates (headline only)"""
+    def generate():
+        last_percentage = -1
+        while True:
+            with progress_lock:
+                progress = progress_tracker.get(job_id, {})
+                percentage = progress.get('percentage', 0)
+                message = progress.get('message', '')
+                status = progress.get('status', 'processing')
+                filepath = progress.get('filepath')
+                filename = progress.get('filename')
+                error = progress.get('error')
+
+            if percentage != last_percentage or status in ['completed', 'error']:
+                data = {
+                    'percentage': percentage,
+                    'message': message,
+                    'status': status
+                }
+                
+                if status == 'completed' and filepath and filename:
+                    data['filepath'] = filepath
+                    data['filename'] = filename
+                    data['download_url'] = f'/api/export/headline-only/download/{job_id}'
+                
+                if status == 'error' and error:
+                    data['error'] = error
+
+                yield f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+                last_percentage = percentage
+
+                if status in ['completed', 'error']:
+                    time.sleep(2)
+                    with progress_lock:
+                        if job_id in progress_tracker:
+                            del progress_tracker[job_id]
+                    break
+
+            time.sleep(0.5)
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+            'Connection': 'keep-alive'
+        }
+    )
+
+
+@app.route('/api/export/word/download/<job_id>')
+def api_export_word_download(job_id):
+    """Download the completed document (word with summaries)"""
+    with progress_lock:
+        progress = progress_tracker.get(job_id, {})
+        filepath = progress.get('filepath')
+        filename = progress.get('filename')
+
+    if not filepath or not filename:
+        return jsonify({'error': 'File not found or job not completed'}), 404
+
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'Generated file not found'}), 404
+
+    try:
+        response = send_file(
+            filepath,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=UTF-8\'\'{quote(filename)}'
+        return response
+    except Exception as e:
+        print(f"Error sending file: {e}")
+        return jsonify({'error': f'Failed to send file: {str(e)}'}), 500
+
+
+@app.route('/api/export/headline-only/download/<job_id>')
+def api_export_headline_only_download(job_id):
+    """Download the completed document (headline only)"""
+    with progress_lock:
+        progress = progress_tracker.get(job_id, {})
+        filepath = progress.get('filepath')
+        filename = progress.get('filename')
+
+    if not filepath or not filename:
+        return jsonify({'error': 'File not found or job not completed'}), 404
+
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'Generated file not found'}), 404
+
+    try:
+        response = send_file(
+            filepath,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        )
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"; filename*=UTF-8\'\'{quote(filename)}'
+        return response
+    except Exception as e:
+        print(f"Error sending file: {e}")
+        return jsonify({'error': f'Failed to send file: {str(e)}'}), 500
+
 
 @app.route('/api/article/<int:article_id>/content')
 def api_article_content(article_id):
@@ -853,7 +1478,7 @@ def api_export_word():
         doc = analyzer.create_word_document(articles, date, include_content)
         
         # Save to temporary file
-        filename = f"palestine_news_{date.replace('-', '_')}.docx"
+        filename = f"palestine_news_with_summaries_{date.replace('-', '_')}.docx"
         temp_path = os.path.join('temp', filename)
         
         # Create temp directory if it doesn't exist
