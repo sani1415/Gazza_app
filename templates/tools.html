@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}أدوات الإدارة - أرشيف أخبار فلسطين{% endblock %}
+{% block title %}{{ t('tools_dashboard') }} - {{ t('app_name') }}{% endblock %}
 
 {% block content %}
 <section class="py-4 bg-secondary text-white">
@@ -9,9 +9,9 @@
             <div class="col-12 text-center">
                 <h1 class="mb-2">
                     <i class="fas fa-tools me-2"></i>
-                    لوحة الأدوات
+                    {{ t('tools_dashboard') }}
                 </h1>
-                <p class="mb-0">إدارة التنزيلات، إنشاء الملفات، والعمل مع الصور بسهولة</p>
+                <p class="mb-0">{{ t('tools_description') }}</p>
             </div>
         </div>
     </div>
@@ -25,27 +25,27 @@
                     <div class="card-body">
                         <h3 class="card-title mb-4">
                             <i class="fas fa-file-word me-2 text-primary"></i>
-                            إنشاء ملفات Word
+                            {{ t('create_word_files') }}
                         </h3>
                         <form id="exportForm" class="row g-3">
                             <div class="col-12">
-                                <label for="exportDate" class="form-label">التاريخ</label>
+                                <label for="exportDate" class="form-label">{{ t('date') }}</label>
                                 <input type="date" class="form-control" id="exportDate" required>
                             </div>
                             <div class="col-12">
-                                <label class="form-label">نوع الملف</label>
+                                <label class="form-label">{{ t('file_type') }}</label>
                                 <div class="list-group">
                                     <button type="button" class="list-group-item list-group-item-action" id="exportHeadlinesBtn">
                                         <i class="fas fa-align-left me-2"></i>
-                                        ملف Word مع العناوين والملخصات (كما في صفحة العناوين)
+                                        {{ t('word_with_summaries') }}
                                     </button>
                                     <button type="button" class="list-group-item list-group-item-action" id="exportHeadlineOnlyBtn">
                                         <i class="fas fa-align-justify me-2"></i>
-                                        ملف Word يحتوي على العناوين متبوعة بالمحتوى الكامل (بدون ملخص)
+                                        {{ t('word_headlines_full') }}
                                     </button>
                                     <button type="button" class="list-group-item list-group-item-action" id="exportWithImagesBtn">
                                         <i class="fas fa-image me-2"></i>
-                                        ملف Word يشمل الصور مع المحتوى الكامل لكل مقال
+                                        {{ t('word_with_images') }}
                                     </button>
                                 </div>
                             </div>
@@ -64,14 +64,14 @@
                         <div class="modal-header">
                             <h5 class="modal-title" id="progressModalLabel">
                                 <i class="fas fa-spinner fa-spin me-2"></i>
-                                جاري إنشاء الملف...
+                                {{ t('creating_file') }}
                             </h5>
                         </div>
                         <div class="modal-body">
                             <div class="mb-3">
                                 <div class="d-flex justify-content-between mb-2">
                                     <span id="progressPercentage" class="fw-bold">0%</span>
-                                    <span id="progressStatus" class="text-muted">بدء العملية...</span>
+                                    <span id="progressStatus" class="text-muted">{{ t('starting_process') }}</span>
                                 </div>
                                 <div class="progress" style="height: 30px;">
                                     <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" 
@@ -81,11 +81,11 @@
                                 </div>
                             </div>
                             <div id="progressMessage" class="text-center text-muted small">
-                                جاري التجهيز...
+                                {{ t('preparing') }}
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" id="cancelProgressBtn" style="display:none;">إلغاء</button>
+                            <button type="button" class="btn btn-secondary" id="cancelProgressBtn" style="display:none;">{{ t('cancel') }}</button>
                         </div>
                     </div>
                 </div>
@@ -96,30 +96,30 @@
                     <div class="card-body">
                         <h3 class="card-title mb-4">
                             <i class="fas fa-download me-2 text-success"></i>
-                            تنزيل الصور
+                            {{ t('download_images') }}
                         </h3>
                         <form id="imageDownloadForm" class="row g-3">
                             <div class="col-md-6">
-                                <label for="imageDate" class="form-label">التاريخ (اختياري)</label>
+                                <label for="imageDate" class="form-label">{{ t('date_optional') }}</label>
                                 <input type="date" class="form-control" id="imageDate">
-                                <div class="form-text">اتركه فارغاً لتحميل جميع الصور</div>
+                                <div class="form-text">{{ t('leave_empty_all') }}</div>
                             </div>
                             <div class="col-md-6">
-                                <label for="imageLimit" class="form-label">حد أقصى للصور (اختياري)</label>
+                                <label for="imageLimit" class="form-label">{{ t('max_images') }}</label>
                                 <input type="number" class="form-control" id="imageLimit" min="1" step="1">
                             </div>
                             <div class="col-12">
                                 <div class="form-check">
                                     <input class="form-check-input" type="checkbox" id="forceDownload">
                                     <label class="form-check-label" for="forceDownload">
-                                        إعادة تحميل الصور حتى لو كانت موجودة (Force)
+                                        {{ t('force_reload') }}
                                     </label>
                                 </div>
                             </div>
                             <div class="col-12">
                                 <button type="submit" class="btn btn-success">
                                     <i class="fas fa-cloud-download-alt me-2"></i>
-                                    بدء تنزيل الصور
+                                    {{ t('start_download') }}
                                 </button>
                             </div>
                             <div class="col-12">
@@ -136,6 +136,59 @@
 
 {% block scripts %}
 <script>
+// Translations for JavaScript
+const translations = {
+    'ar': {
+        'please_select_date_first': 'يرجى تحديد التاريخ أولاً.',
+        'preparing': 'جاري التجهيز...',
+        'starting_process': 'بدء العملية...',
+        'completed': 'اكتمل!',
+        'file_created_success': 'تم إنشاء الملف بنجاح! جاري التنزيل...',
+        'error_occurred_file': 'حدث خطأ أثناء إنشاء الملف',
+        'close': 'إغلاق',
+        'connection_error': 'حدث خطأ في الاتصال بالخادم',
+        'downloading_images': 'جاري تنزيل الصور ... يرجى الانتظار.',
+        'error_downloading_images': 'حدث خطأ أثناء تنزيل الصور.',
+        'export_success_headlines': 'تم إنشاء الملف مع العناوين والملخصات بنجاح، جاري التنزيل...',
+        'export_success': 'تم إنشاء الملف بنجاح، جاري التنزيل...',
+        'export_success_images': 'تم إنشاء الملف مع الصور بنجاح، جاري التنزيل...',
+        'requested_images': 'تم طلب',
+        'image_with_links': 'صورة تحتوي على روابط.',
+        'downloaded_new': 'تم تنزيل',
+        'new_image': 'صورة جديدة.',
+        'skipped_existing': 'تم تخطي',
+        'existing_images': 'صور موجودة مسبقًا.',
+        'errors_during': 'أخطاء أثناء التحميل:',
+        'folder': 'المجلد:'
+    },
+    'en': {
+        'please_select_date_first': 'Please select a date first.',
+        'preparing': 'Preparing...',
+        'starting_process': 'Starting process...',
+        'completed': 'Completed!',
+        'file_created_success': 'File created successfully! Downloading...',
+        'error_occurred_file': 'An error occurred while creating the file',
+        'close': 'Close',
+        'connection_error': 'A connection error occurred with the server',
+        'downloading_images': 'Downloading images... Please wait.',
+        'error_downloading_images': 'An error occurred while downloading images.',
+        'export_success_headlines': 'File with headlines and summaries created successfully, downloading...',
+        'export_success': 'File created successfully, downloading...',
+        'export_success_images': 'File with images created successfully, downloading...',
+        'requested_images': 'Requested',
+        'image_with_links': 'images with links.',
+        'downloaded_new': 'Downloaded',
+        'new_image': 'new images.',
+        'skipped_existing': 'Skipped',
+        'existing_images': 'existing images.',
+        'errors_during': 'Errors during download:',
+        'folder': 'Folder:'
+    }
+};
+
+const currentLang = '{{ lang }}';
+const t = (key) => translations[currentLang]?.[key] || key;
+
 const exportStatus = document.getElementById('exportStatus');
 const exportDateInput = document.getElementById('exportDate');
 const exportHeadlinesBtn = document.getElementById('exportHeadlinesBtn');
@@ -173,7 +226,7 @@ const triggerDownload = (url) => {
 function startExportWithProgress(startEndpoint, progressEndpoint, successMessage, includeContent = false) {
     const date = exportDateInput.value;
     if (!date) {
-        showExportMessage('يرجى تحديد التاريخ أولاً.', 'warning');
+        showExportMessage(t('please_select_date_first'), 'warning');
         return;
     }
 
@@ -194,8 +247,8 @@ function startExportWithProgress(startEndpoint, progressEndpoint, successMessage
     progressBar.setAttribute('aria-valuenow', '0');
     progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
     progressPercentage.textContent = '0%';
-    progressMessage.textContent = 'جاري التجهيز...';
-    progressStatus.textContent = 'بدء العملية...';
+    progressMessage.textContent = t('preparing');
+    progressStatus.textContent = t('starting_process');
     cancelBtn.style.display = 'none';
 
     // Start the job
@@ -239,8 +292,8 @@ function startExportWithProgress(startEndpoint, progressEndpoint, successMessage
             if (status === 'completed') {
                 progressBar.classList.remove('progress-bar-animated');
                 progressBar.classList.add('bg-success');
-                progressStatus.textContent = 'اكتمل!';
-                progressMessage.textContent = 'تم إنشاء الملف بنجاح! جاري التنزيل...';
+                progressStatus.textContent = t('completed');
+                progressMessage.textContent = t('file_created_success');
                 
                 // Close modal and trigger download
                 setTimeout(() => {
@@ -256,14 +309,14 @@ function startExportWithProgress(startEndpoint, progressEndpoint, successMessage
                 progressBar.classList.remove('progress-bar-animated');
                 progressBar.classList.add('bg-danger');
                 progressStatus.textContent = 'خطأ!';
-                progressMessage.textContent = data.error || 'حدث خطأ أثناء إنشاء الملف';
+                progressMessage.textContent = data.error || t('error_occurred_file');
                 cancelBtn.style.display = 'block';
-                cancelBtn.textContent = 'إغلاق';
+                cancelBtn.textContent = t('close');
                 cancelBtn.onclick = () => {
                     progressModal.hide();
                     eventSource.close();
                 };
-                showExportMessage(data.error || 'حدث خطأ أثناء إنشاء الملف', 'danger');
+                showExportMessage(data.error || t('error_occurred_file'), 'danger');
             }
         };
         
@@ -272,14 +325,14 @@ function startExportWithProgress(startEndpoint, progressEndpoint, successMessage
             progressBar.classList.remove('progress-bar-animated');
             progressBar.classList.add('bg-danger');
             progressStatus.textContent = 'خطأ في الاتصال!';
-            progressMessage.textContent = 'حدث خطأ في الاتصال بالخادم';
+            progressMessage.textContent = t('connection_error');
             cancelBtn.style.display = 'block';
-            cancelBtn.textContent = 'إغلاق';
+            cancelBtn.textContent = t('close');
             cancelBtn.onclick = () => {
                 progressModal.hide();
                 if (eventSource) eventSource.close();
             };
-            showExportMessage('حدث خطأ في الاتصال بالخادم', 'danger');
+            showExportMessage(t('connection_error'), 'danger');
         };
     })
     .catch(error => {
@@ -292,7 +345,7 @@ exportHeadlinesBtn.addEventListener('click', () => {
     startExportWithProgress(
         '/api/export/word/start',
         '/api/export/word/progress',
-        'تم إنشاء الملف مع العناوين والملخصات بنجاح، جاري التنزيل...'
+        t('export_success_headlines')
     );
 });
 
@@ -300,7 +353,7 @@ exportHeadlineOnlyBtn.addEventListener('click', () => {
     startExportWithProgress(
         '/api/export/headline-only/start',
         '/api/export/headline-only/progress',
-        'تم إنشاء الملف بنجاح، جاري التنزيل...'
+        t('export_success')
     );
 });
 
@@ -308,14 +361,14 @@ exportWithImagesBtn.addEventListener('click', () => {
     startExportWithProgress(
         '/api/export/word-with-images/start',
         '/api/export/word-with-images/progress',
-        'تم إنشاء الملف مع الصور بنجاح، جاري التنزيل...',
+        t('export_success_images'),
         true  // include_content = true
     );
 });
 
 imageDownloadForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    showDownloadMessage('جاري تنزيل الصور ... يرجى الانتظار.', 'info');
+    showDownloadMessage(t('downloading_images'), 'info');
 
     const payload = {
         date: imageDateInput.value || null,
@@ -333,14 +386,20 @@ imageDownloadForm.addEventListener('submit', (event) => {
     .then(response => response.json())
     .then(data => {
         if (!data.success) {
-            throw new Error(data.error || 'حدث خطأ أثناء تنزيل الصور.');
+            throw new Error(data.error || t('error_downloading_images'));
         }
-        const parts = [
-            `تم طلب ${data.requested} صورة تحتوي على روابط.`,
-            `تم تنزيل ${data.downloaded} صورة جديدة.`,
-            `تم تخطي ${data.skipped} صور موجودة مسبقًا.`,
-            `أخطاء أثناء التحميل: ${data.errors}.`,
-            `المجلد: ${data.output_dir}`
+        const parts = currentLang === 'ar' ? [
+            `${t('requested_images')} ${data.requested} ${t('image_with_links')}`,
+            `${t('downloaded_new')} ${data.downloaded} ${t('new_image')}`,
+            `${t('skipped_existing')} ${data.skipped} ${t('existing_images')}`,
+            `${t('errors_during')} ${data.errors}.`,
+            `${t('folder')} ${data.output_dir}`
+        ] : [
+            `${t('requested_images')} ${data.requested} ${t('image_with_links')}`,
+            `${t('downloaded_new')} ${data.downloaded} ${t('new_image')}`,
+            `${t('skipped_existing')} ${data.skipped} ${t('existing_images')}`,
+            `${t('errors_during')} ${data.errors}.`,
+            `${t('folder')} ${data.output_dir}`
         ];
         showDownloadMessage(parts.join('\n'), 'success');
     })

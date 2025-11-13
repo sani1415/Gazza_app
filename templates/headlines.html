@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}عناوين الأخبار حسب التاريخ - أرشيف أخبار فلسطين{% endblock %}
+{% block title %}{{ t('headlines_by_date') }} - {{ t('app_name') }}{% endblock %}
 
 {% block content %}
 <!-- Page Header -->
@@ -10,9 +10,9 @@
             <div class="col-12">
                 <h1 class="mb-0">
                     <i class="fas fa-newspaper me-2"></i>
-                    عناوين الأخبار حسب التاريخ
+                    {{ t('headlines_by_date') }}
                 </h1>
-                <p class="mb-0">اختر تاريخاً لعرض جميع العناوين من ذلك اليوم</p>
+                <p class="mb-0">{{ t('choose_date') }}</p>
             </div>
         </div>
     </div>
@@ -25,24 +25,24 @@
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title text-center mb-4">اختر التاريخ</h5>
+                        <h5 class="card-title text-center mb-4">{{ t('select_date') }}</h5>
                         <form id="dateForm">
                             <div class="mb-3">
-                                <label for="dateInput" class="form-label">التاريخ</label>
+                                <label for="dateInput" class="form-label">{{ t('date') }}</label>
                                 <input type="date" class="form-control" id="dateInput" required>
                             </div>
                             <div class="d-grid gap-2">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-search me-2"></i>
-                                    عرض العناوين
+                                    {{ t('show_headlines') }}
                                 </button>
                                 <button type="button" class="btn btn-success" onclick="exportToWord(false)" id="exportBtn" disabled>
                                     <i class="fas fa-file-word me-2"></i>
-                                    تصدير إلى Word (العناوين فقط)
+                                    {{ t('export_headlines_only') }}
                                 </button>
                                 <button type="button" class="btn btn-info" onclick="exportToWord(true)" id="exportFullBtn" disabled>
                                     <i class="fas fa-file-alt me-2"></i>
-                                    تصدير إلى Word (المحتوى الكامل)
+                                    {{ t('export_full_content') }}
                                 </button>
                             </div>
                         </form>
@@ -60,23 +60,23 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0" id="resultsTitle">عناوين الأخبار</h5>
-                        <span class="badge bg-primary" id="resultsCount">0 مقال</span>
+                        <h5 class="mb-0" id="resultsTitle">{{ t('headlines_title') }}</h5>
+                        <span class="badge bg-primary" id="resultsCount">0 {{ t('article') }}</span>
                     </div>
                     <div class="card-body">
                         <!-- Loading -->
                         <div id="loadingIndicator" class="text-center py-4" style="display: none;">
                             <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">جاري التحميل...</span>
+                                <span class="visually-hidden">{{ t('loading') }}</span>
                             </div>
-                            <p class="mt-2">جاري تحميل العناوين...</p>
+                            <p class="mt-2">{{ t('loading') }}</p>
                         </div>
                         
                         <!-- No Results -->
                         <div id="noResults" class="text-center py-4" style="display: none;">
                             <i class="fas fa-newspaper fa-3x text-muted mb-3"></i>
-                            <h5>لا توجد مقالات في هذا التاريخ</h5>
-                            <p class="text-muted">جرب تاريخاً آخر أو تحقق من صحة التاريخ المحدد</p>
+                            <h5>{{ t('no_articles_date') }}</h5>
+                            <p class="text-muted">{{ t('try_another_date') }}</p>
                         </div>
                         
                         <!-- Headlines List -->
@@ -100,6 +100,66 @@
 
 {% block scripts %}
 <script>
+// Translations for JavaScript
+const translations = {
+    'ar': {
+        'loading': 'جاري التحميل...',
+        'no_articles_date': 'لا توجد مقالات في هذا التاريخ',
+        'try_another_date': 'جرب تاريخاً آخر أو تحقق من صحة التاريخ المحدد',
+        'headlines_title': 'عناوين الأخبار',
+        'article': 'مقال',
+        'error_loading_headlines': 'حدث خطأ في تحميل العناوين. يرجى المحاولة مرة أخرى.',
+        'no_articles': 'لا توجد مقالات',
+        'please_select_date': 'يرجى اختيار تاريخ أولاً',
+        'exporting': 'جاري التصدير...'
+    },
+    'en': {
+        'loading': 'Loading...',
+        'no_articles_date': 'No articles found for this date',
+        'try_another_date': 'Try another date or verify the selected date',
+        'headlines_title': 'Headlines',
+        'article': 'article',
+        'error_loading_headlines': 'An error occurred while loading headlines. Please try again.',
+        'no_articles': 'No articles found',
+        'please_select_date': 'Please select a date first',
+        'exporting': 'Exporting...'
+    }
+};
+
+const currentLang = '{{ lang }}';
+const t = (key) => translations[currentLang]?.[key] || key;
+
+const typeLabels = {
+    'ar': {
+        'post': 'مقال',
+        'video': 'فيديو',
+        'liveblog': 'بث مباشر',
+        'episode': 'حلقة',
+        'gallery': 'معرض صور'
+    },
+    'en': {
+        'post': 'Article',
+        'video': 'Video',
+        'liveblog': 'Live Blog',
+        'episode': 'Episode',
+        'gallery': 'Gallery'
+    }
+};
+
+function getTypeLabel(type) {
+    return typeLabels[currentLang]?.[type] || type;
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    const locale = currentLang === 'ar' ? 'ar-SA' : 'en-US';
+    return date.toLocaleDateString(locale, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+    });
+}
+
 let currentPage = 1;
 let currentDate = '';
 const perPage = 50;
@@ -138,15 +198,15 @@ function loadHeadlines(date, page) {
             
             if (data.total === 0) {
                 noResults.style.display = 'block';
-                document.getElementById('resultsTitle').textContent = `عناوين الأخبار - ${formatDate(date)}`;
-                document.getElementById('resultsCount').textContent = '0 مقال';
+                document.getElementById('resultsTitle').textContent = `${t('headlines_title')} - ${formatDate(date)}`;
+                document.getElementById('resultsCount').textContent = `0 ${t('article')}`;
                 // Disable export buttons
                 document.getElementById('exportBtn').disabled = true;
                 document.getElementById('exportFullBtn').disabled = true;
             } else {
                 displayHeadlines(data.articles);
-                document.getElementById('resultsTitle').textContent = `عناوين الأخبار - ${formatDate(date)}`;
-                document.getElementById('resultsCount').textContent = `${data.total.toLocaleString()} مقال`;
+                document.getElementById('resultsTitle').textContent = `${t('headlines_title')} - ${formatDate(date)}`;
+                document.getElementById('resultsCount').textContent = `${data.total.toLocaleString()} ${t('article')}`;
                 
                 // Enable export buttons
                 document.getElementById('exportBtn').disabled = false;
@@ -162,7 +222,7 @@ function loadHeadlines(date, page) {
             headlinesList.innerHTML = `
                 <div class="alert alert-danger text-center">
                     <i class="fas fa-exclamation-triangle me-2"></i>
-                    حدث خطأ في تحميل العناوين. يرجى المحاولة مرة أخرى.
+                    ${t('error_loading_headlines')}
                 </div>
             `;
         });
@@ -173,7 +233,7 @@ function displayHeadlines(articles) {
     const headlinesList = document.getElementById('headlinesList');
     
     if (articles.length === 0) {
-        headlinesList.innerHTML = '<p class="text-muted text-center">لا توجد مقالات</p>';
+        headlinesList.innerHTML = `<p class="text-muted text-center">${t('no_articles')}</p>`;
         return;
     }
     
@@ -261,17 +321,7 @@ function displayPagination(currentPage, totalPages) {
     paginationList.innerHTML = html;
 }
 
-// Helper functions
-function getTypeLabel(type) {
-    const labels = {
-        'post': 'مقال',
-        'video': 'فيديو',
-        'liveblog': 'بث مباشر',
-        'episode': 'حلقة',
-        'gallery': 'معرض صور'
-    };
-    return labels[type] || type;
-}
+// Helper functions - getTypeLabel is now defined above
 
 function getTypeClass(type) {
     const classes = {
@@ -284,19 +334,12 @@ function getTypeClass(type) {
     return classes[type] || 'bg-secondary';
 }
 
-function formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('ar-SA', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-    });
-}
+// formatDate is now defined above
 
 // Export to Word function
 function exportToWord(includeContent) {
     if (!currentDate) {
-        alert('يرجى اختيار تاريخ أولاً');
+        alert(t('please_select_date'));
         return;
     }
     
@@ -304,7 +347,7 @@ function exportToWord(includeContent) {
     const originalText = exportBtn.innerHTML;
     
     // Show loading state
-    exportBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>جاري التصدير...';
+    exportBtn.innerHTML = `<i class="fas fa-spinner fa-spin me-2"></i>${t('exporting')}`;
     exportBtn.disabled = true;
     
     // Create download link

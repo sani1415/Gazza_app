@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ article.title }} - أرشيف أخبار فلسطين{% endblock %}
+{% block title %}{{ article.title }} - {{ t('app_name') }}{% endblock %}
 
 {% block content %}
 <!-- Article Detail -->
@@ -18,9 +18,9 @@
                                 </span>
                                 <small class="text-muted ms-2">{{ article.date }}</small>
                             </div>
-                            <a href="/search" class="btn btn-outline-secondary btn-sm">
-                                <i class="fas fa-arrow-right me-1"></i>
-                                العودة للبحث
+                            <a href="/" class="btn btn-outline-secondary btn-sm">
+                                <i class="fas fa-arrow-{% if lang == 'ar' %}right{% else %}left{% endif %} me-1"></i>
+                                {{ t('back_to_search') }}
                             </a>
                         </div>
                         
@@ -30,39 +30,39 @@
                         <!-- Article Image -->
                         {% if article.image_url %}
                         <div class="text-center mb-4">
-                            <img src="{{ article.image_url }}" class="img-fluid rounded" alt="صورة المقال" style="max-height: 400px;">
+                            <img src="{{ article.image_url }}" class="img-fluid rounded" alt="{{ t('article_image') }}" style="max-height: 400px;">
                         </div>
                         {% endif %}
                         
                         <!-- Article Excerpt -->
                         <div class="article-excerpt mb-4">
-                            <h5>ملخص المقال:</h5>
+                            <h5>{{ t('article_summary') }}</h5>
                             <p class="lead">{{ article.excerpt }}</p>
                         </div>
                         
                         <!-- Full Article Content -->
                         <div class="article-content mb-4">
                             <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h5>المحتوى الكامل:</h5>
+                                <h5>{{ t('full_content') }}</h5>
                                 <button class="btn btn-outline-primary btn-sm" onclick="loadFullContent()" id="loadContentBtn">
                                     <i class="fas fa-download me-1"></i>
-                                    تحميل المحتوى الكامل
+                                    {{ t('load_full_content') }}
                                 </button>
                             </div>
                             <div id="fullContent" class="content-placeholder">
                                 <div class="text-center py-4">
                                     <i class="fas fa-newspaper fa-2x text-muted mb-3"></i>
-                                    <p class="text-muted">انقر على "تحميل المحتوى الكامل" لعرض المقال كاملاً</p>
+                                    <p class="text-muted">{{ t('click_to_load') }}</p>
                                 </div>
                             </div>
                         </div>
                         
                         <!-- Article Link -->
                         <div class="article-link mb-4">
-                            <h5>رابط المقال الأصلي:</h5>
+                            <h5>{{ t('original_link') }}</h5>
                             <a href="{{ article.link }}" target="_blank" class="btn btn-outline-secondary">
                                 <i class="fas fa-external-link-alt me-2"></i>
-                                فتح المقال على الجزيرة نت
+                                {{ t('open_on_aljazeera') }}
                             </a>
                         </div>
                         
@@ -70,24 +70,24 @@
                         <div class="article-metadata">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <h6>معلومات المقال:</h6>
+                                    <h6>{{ t('article_info') }}</h6>
                                     <ul class="list-unstyled">
-                                        <li><strong>المصدر:</strong> {{ article.source }}</li>
-                                        <li><strong>نوع المحتوى:</strong> {{ getTypeLabel(article.type) }}</li>
-                                        <li><strong>تاريخ النشر:</strong> {{ article.date }}</li>
-                                        <li><strong>معرف المقال:</strong> #{{ article.id }}</li>
+                                        <li><strong>{{ t('source') }}</strong> {{ article.source }}</li>
+                                        <li><strong>{{ t('content_type_label') }}</strong> {{ getTypeLabel(article.type) }}</li>
+                                        <li><strong>{{ t('publish_date') }}</strong> {{ article.date }}</li>
+                                        <li><strong>{{ t('article_id') }}</strong> #{{ article.id }}</li>
                                     </ul>
                                 </div>
                                 <div class="col-md-6">
-                                    <h6>إجراءات:</h6>
+                                    <h6>{{ t('actions') }}</h6>
                                     <div class="d-grid gap-2">
                                         <button class="btn btn-outline-primary" onclick="shareArticle()">
                                             <i class="fas fa-share me-2"></i>
-                                            مشاركة المقال
+                                            {{ t('share_article') }}
                                         </button>
                                         <button class="btn btn-outline-secondary" onclick="printArticle()">
                                             <i class="fas fa-print me-2"></i>
-                                            طباعة المقال
+                                            {{ t('print_article') }}
                                         </button>
                                     </div>
                                 </div>
@@ -107,12 +107,12 @@
             <div class="col-12">
                 <h3 class="mb-4">
                     <i class="fas fa-newspaper me-2"></i>
-                    مقالات ذات صلة
+                    {{ t('related_articles') }}
                 </h3>
                 <div id="relatedArticles">
                     <div class="text-center">
                         <div class="spinner-border" role="status">
-                            <span class="visually-hidden">جاري التحميل...</span>
+                            <span class="visually-hidden">{{ t('loading') }}</span>
                         </div>
                     </div>
                 </div>
@@ -124,15 +124,49 @@
 
 {% block scripts %}
 <script>
-// Get type label in Arabic
-function getTypeLabel(type) {
-    const labels = {
+// Translations for JavaScript
+const translations = {
+    'ar': {
         'post': 'مقال',
         'video': 'فيديو',
         'liveblog': 'بث مباشر',
-        'episode': 'حلقة'
-    };
-    return labels[type] || type;
+        'episode': 'حلقة',
+        'gallery': 'معرض صور',
+        'cannot_load_related': 'لا يمكن تحميل المقالات ذات الصلة حالياً',
+        'no_related_articles': 'لا توجد مقالات ذات صلة',
+        'link_copied': 'تم نسخ رابط المقال إلى الحافظة',
+        'loading_content': 'جاري تحميل المحتوى...',
+        'loading_full_content': 'جاري تحميل المحتوى الكامل للمقال...',
+        'error_loading_content': 'حدث خطأ في تحميل المحتوى. يرجى المحاولة مرة أخرى.',
+        'load_full_content': 'تحميل المحتوى الكامل',
+        'read_more': 'قراءة المزيد',
+        'article_image': 'صورة المقال',
+        'not_specified': 'غير محدد'
+    },
+    'en': {
+        'post': 'Article',
+        'video': 'Video',
+        'liveblog': 'Live Blog',
+        'episode': 'Episode',
+        'gallery': 'Gallery',
+        'cannot_load_related': 'Cannot load related articles at this time',
+        'no_related_articles': 'No related articles found',
+        'link_copied': 'Article link copied to clipboard',
+        'loading_content': 'Loading content...',
+        'loading_full_content': 'Loading full article content...',
+        'error_loading_content': 'An error occurred while loading content. Please try again.',
+        'load_full_content': 'Load Full Content',
+        'read_more': 'Read More',
+        'article_image': 'Article Image',
+        'not_specified': 'Not specified'
+    }
+};
+
+const currentLang = '{{ lang }}';
+const t = (key) => translations[currentLang]?.[key] || key;
+
+function getTypeLabel(type) {
+    return t(type) || type;
 }
 
 // Share article
@@ -147,7 +181,7 @@ function shareArticle() {
         // Fallback: copy to clipboard
         const url = window.location.href;
         navigator.clipboard.writeText(url).then(() => {
-            alert('تم نسخ رابط المقال إلى الحافظة');
+            alert(t('link_copied'));
         });
     }
 }
@@ -180,7 +214,7 @@ function loadRelatedArticles() {
             document.getElementById('relatedArticles').innerHTML = `
                 <div class="alert alert-warning">
                     <i class="fas fa-exclamation-triangle me-2"></i>
-                    لا يمكن تحميل المقالات ذات الصلة حالياً
+                    ${t('cannot_load_related')}
                 </div>
             `;
         });
@@ -194,7 +228,7 @@ function displayRelatedArticles(articles) {
         container.innerHTML = `
             <div class="alert alert-info">
                 <i class="fas fa-info-circle me-2"></i>
-                لا توجد مقالات ذات صلة
+                ${t('no_related_articles')}
             </div>
         `;
         return;
@@ -204,13 +238,13 @@ function displayRelatedArticles(articles) {
     
     articles.forEach(article => {
         const typeClass = `article-type-${article.type}`;
-        const date = new Date(article.date).toLocaleDateString('ar-SA');
+        const date = article.date || t('not_specified');
         
         html += `
             <div class="col-md-6 col-lg-4">
                 <div class="card article-card h-100">
                     ${article.image_url ? `
-                        <img src="${article.image_url}" class="card-img-top" alt="صورة المقال" style="height: 200px; object-fit: cover;">
+                        <img src="${article.image_url}" class="card-img-top" alt="${t('article_image')}" style="height: 200px; object-fit: cover;">
                     ` : ''}
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
@@ -218,10 +252,10 @@ function displayRelatedArticles(articles) {
                             <small class="text-muted">${date}</small>
                         </div>
                         <h6 class="card-title">${article.title}</h6>
-                        <p class="card-text text-muted small">${article.excerpt.substring(0, 100)}...</p>
+                        <p class="card-text text-muted small">${article.excerpt ? article.excerpt.substring(0, 100) + '...' : ''}</p>
                         <a href="/article/${article.id}" class="btn btn-outline-primary btn-sm">
                             <i class="fas fa-eye me-1"></i>
-                            قراءة المزيد
+                            ${t('read_more')}
                         </a>
                     </div>
                 </div>
@@ -239,15 +273,15 @@ function loadFullContent() {
     const loadBtn = document.getElementById('loadContentBtn');
     
     // Show loading state
-    loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>جاري التحميل...';
+    loadBtn.innerHTML = `<i class="fas fa-spinner fa-spin me-1"></i>${t('loading_content')}`;
     loadBtn.disabled = true;
     
     contentDiv.innerHTML = `
         <div class="text-center py-4">
             <div class="spinner-border text-primary" role="status">
-                <span class="visually-hidden">جاري تحميل المحتوى...</span>
+                <span class="visually-hidden">${t('loading_content')}</span>
             </div>
-            <p class="mt-2">جاري تحميل المحتوى الكامل للمقال...</p>
+            <p class="mt-2">${t('loading_full_content')}</p>
         </div>
     `;
     
@@ -286,13 +320,13 @@ function loadFullContent() {
             contentDiv.innerHTML = `
                 <div class="alert alert-danger">
                     <i class="fas fa-exclamation-triangle me-2"></i>
-                    حدث خطأ في تحميل المحتوى. يرجى المحاولة مرة أخرى.
+                    ${t('error_loading_content')}
                 </div>
             `;
         })
         .finally(() => {
             // Reset button state
-            loadBtn.innerHTML = '<i class="fas fa-download me-1"></i>تحميل المحتوى الكامل';
+            loadBtn.innerHTML = `<i class="fas fa-download me-1"></i>${t('load_full_content')}`;
             loadBtn.disabled = false;
         });
 }
@@ -315,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function() {
     background: #f8f9fa;
     padding: 1.5rem;
     border-radius: 10px;
-    border-left: 4px solid #667eea;
+    border-left: 4px solid #4a90e2;
 }
 
 .article-metadata {

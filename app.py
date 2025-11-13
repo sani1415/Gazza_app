@@ -19,7 +19,7 @@ from docx import Document
 from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.shared import OxmlElement, qn
-from flask import Flask, render_template, request, jsonify, send_file, Response, stream_with_context
+from flask import Flask, render_template, request, jsonify, send_file, Response, stream_with_context, session, redirect, url_for
 from pathlib import Path
 from urllib.parse import urlparse, unquote, quote
 from typing import Optional, Tuple, Callable
@@ -28,25 +28,318 @@ from PIL import Image
 from bs4 import BeautifulSoup
 
 app = Flask(__name__)
+app.secret_key = 'your-secret-key-change-this-in-production'  # For session support
+
+# Translation dictionary
+TRANSLATIONS = {
+    'ar': {
+        'app_name': 'أرشيف أخبار فلسطين',
+        'home': 'الرئيسية / البحث',
+        'headlines': 'عناوين حسب التاريخ',
+        'images': 'معرض الصور',
+        'tools': 'أدوات',
+        'search_archive': 'ابحث في الأرشيف',
+        'search_placeholder': 'اكتب كلمات البحث هنا...',
+        'content_type': 'نوع المحتوى',
+        'all_types': 'جميع الأنواع',
+        'articles': 'مقالات',
+        'videos': 'فيديوهات',
+        'live_blog': 'بث مباشر',
+        'episodes': 'حلقات',
+        'search_type': 'نوع البحث',
+        'title_and_content': 'العنوان والمحتوى',
+        'title_only': 'العنوان فقط',
+        'content_only': 'المحتوى فقط',
+        'from_date': 'من تاريخ',
+        'to_date': 'إلى تاريخ',
+        'search': 'بحث',
+        'quick_keywords': 'كلمات مفتاحية سريعة',
+        'total_articles': 'مقال إخباري',
+        'article': 'مقال',
+        'video': 'فيديو',
+        'liveblog': 'بث مباشر',
+        'episode': 'حلقة',
+        'gallery': 'معرض صور',
+        'search_results': 'نتائج البحث',
+        'no_results': 'لم يتم العثور على نتائج',
+        'try_different': 'جرب كلمات بحث مختلفة',
+        'read_more': 'قراءة المزيد',
+        'original_article': 'المقال الأصلي',
+        'articles_from': 'مقال إخباري من الجزيرة نت',
+        'comprehensive_collection': 'مجموعة شاملة من',
+        'all_rights_reserved': 'جميع الحقوق محفوظة',
+        'previous': 'السابق',
+        'next': 'التالي',
+        'searching': 'جاري البحث...',
+        'error_occurred': 'حدث خطأ أثناء البحث. يرجى المحاولة مرة أخرى.',
+        'please_enter_search': 'يرجى إدخال كلمات البحث',
+        'copyright': '&copy; 2025 أرشيف أخبار فلسطين - جميع الحقوق محفوظة',
+        'back_to_search': 'العودة للبحث',
+        'article_summary': 'ملخص المقال:',
+        'full_content': 'المحتوى الكامل:',
+        'load_full_content': 'تحميل المحتوى الكامل',
+        'click_to_load': 'انقر على "تحميل المحتوى الكامل" لعرض المقال كاملاً',
+        'original_link': 'رابط المقال الأصلي:',
+        'open_on_aljazeera': 'فتح المقال على الجزيرة نت',
+        'article_info': 'معلومات المقال:',
+        'source': 'المصدر:',
+        'content_type_label': 'نوع المحتوى:',
+        'publish_date': 'تاريخ النشر:',
+        'article_id': 'معرف المقال:',
+        'actions': 'إجراءات:',
+        'share_article': 'مشاركة المقال',
+        'print_article': 'طباعة المقال',
+        'related_articles': 'مقالات ذات صلة',
+        'loading': 'جاري التحميل...',
+        'cannot_load_related': 'لا يمكن تحميل المقالات ذات الصلة حالياً',
+        'no_related_articles': 'لا توجد مقالات ذات صلة',
+        'loading_content': 'جاري تحميل المحتوى...',
+        'loading_full_content': 'جاري تحميل المحتوى الكامل للمقال...',
+        'error_loading_content': 'حدث خطأ في تحميل المحتوى. يرجى المحاولة مرة أخرى.',
+        'link_copied': 'تم نسخ رابط المقال إلى الحافظة',
+        'choose_date': 'اختر تاريخاً لعرض جميع العناوين من ذلك اليوم',
+        'select_date': 'اختر التاريخ',
+        'date': 'التاريخ',
+        'show_headlines': 'عرض العناوين',
+        'export_headlines_only': 'تصدير إلى Word (العناوين فقط)',
+        'export_full_content': 'تصدير إلى Word (المحتوى الكامل)',
+        'headlines_by_date': 'عناوين الأخبار حسب التاريخ',
+        'headlines_title': 'عناوين الأخبار',
+        'no_articles_date': 'لا توجد مقالات في هذا التاريخ',
+        'try_another_date': 'جرب تاريخاً آخر أو تحقق من صحة التاريخ المحدد',
+        'please_select_date': 'يرجى اختيار تاريخ أولاً',
+        'exporting': 'جاري التصدير...',
+        'tools_dashboard': 'لوحة الأدوات',
+        'tools_description': 'إدارة التنزيلات، إنشاء الملفات، والعمل مع الصور بسهولة',
+        'create_word_files': 'إنشاء ملفات Word',
+        'file_type': 'نوع الملف',
+        'word_with_summaries': 'ملف Word مع العناوين والملخصات (كما في صفحة العناوين)',
+        'word_headlines_full': 'ملف Word يحتوي على العناوين متبوعة بالمحتوى الكامل (بدون ملخص)',
+        'word_with_images': 'ملف Word يشمل الصور مع المحتوى الكامل لكل مقال',
+        'creating_file': 'جاري إنشاء الملف...',
+        'starting_process': 'بدء العملية...',
+        'preparing': 'جاري التجهيز...',
+        'cancel': 'إلغاء',
+        'download_images': 'تنزيل الصور',
+        'date_optional': 'التاريخ (اختياري)',
+        'leave_empty_all': 'اتركه فارغاً لتحميل جميع الصور',
+        'max_images': 'حد أقصى للصور (اختياري)',
+        'force_reload': 'إعادة تحميل الصور حتى لو كانت موجودة (Force)',
+        'start_download': 'بدء تنزيل الصور',
+        'please_select_date_first': 'يرجى تحديد التاريخ أولاً.',
+        'completed': 'اكتمل!',
+        'file_created_success': 'تم إنشاء الملف بنجاح! جاري التنزيل...',
+        'error_occurred_file': 'حدث خطأ أثناء إنشاء الملف',
+        'close': 'إغلاق',
+        'connection_error': 'حدث خطأ في الاتصال بالخادم',
+        'downloading_images': 'جاري تنزيل الصور ... يرجى الانتظار.',
+        'image_gallery': 'معرض الصور الإخباري',
+        'gallery_description': 'استعرض المقالات التي تحتوي على صور واكتشف أبرز اللقطات اليومية',
+        'results_per_page': 'عدد النتائج في الصفحة',
+        'no_articles': 'لا توجد مقالات',
+        'article_image': 'صورة المقال',
+        'page': 'الصفحة',
+        'of': 'من',
+        'start_search': 'ابدأ البحث لرؤية النتائج',
+        'search_keywords': 'كلمات البحث',
+        'search_in_archive': 'البحث في الأرشيف',
+        'found_results': 'تم العثور على',
+        'result': 'نتيجة',
+        'results': 'نتائج',
+        'modify_filters': 'قم بتعديل المرشحات',
+        'show_results': 'عرض النتائج',
+        'reset': 'إعادة التعيين',
+        'loading_images': 'جاري تحميل الصور...',
+        'no_images_date': 'لا توجد مقالات تحتوي على صور في هذا التاريخ.',
+        'view_details': 'عرض التفاصيل',
+        'open_image': 'فتح الصورة',
+        'showing': 'تم عرض',
+        'of': 'من',
+        'articles_with_images': 'مقال يحتوي على صور.',
+        'error_loading_images': 'حدث خطأ أثناء تحميل الصور. يرجى المحاولة مرة أخرى.',
+        'export_success_headlines': 'تم إنشاء الملف مع العناوين والملخصات بنجاح، جاري التنزيل...',
+        'export_success': 'تم إنشاء الملف بنجاح، جاري التنزيل...',
+        'export_success_images': 'تم إنشاء الملف مع الصور بنجاح، جاري التنزيل...',
+        'error_downloading_images': 'حدث خطأ أثناء تنزيل الصور.',
+        'requested_images': 'تم طلب',
+        'image_with_links': 'صورة تحتوي على روابط.',
+        'downloaded_new': 'تم تنزيل',
+        'new_image': 'صورة جديدة.',
+        'skipped_existing': 'تم تخطي',
+        'existing_images': 'صور موجودة مسبقًا.',
+        'errors_during': 'أخطاء أثناء التحميل:',
+        'folder': 'المجلد:'
+    },
+    'en': {
+        'app_name': 'Palestine News Archive',
+        'home': 'Home / Search',
+        'headlines': 'Headlines by Date',
+        'images': 'Image Gallery',
+        'tools': 'Tools',
+        'search_archive': 'Search Archive',
+        'search_placeholder': 'Enter search keywords here...',
+        'content_type': 'Content Type',
+        'all_types': 'All Types',
+        'articles': 'Articles',
+        'videos': 'Videos',
+        'live_blog': 'Live Blog',
+        'episodes': 'Episodes',
+        'search_type': 'Search Type',
+        'title_and_content': 'Title and Content',
+        'title_only': 'Title Only',
+        'content_only': 'Content Only',
+        'from_date': 'From Date',
+        'to_date': 'To Date',
+        'search': 'Search',
+        'quick_keywords': 'Quick Keywords',
+        'total_articles': 'News Articles',
+        'article': 'Article',
+        'video': 'Video',
+        'liveblog': 'Live Blog',
+        'episode': 'Episode',
+        'gallery': 'Gallery',
+        'search_results': 'Search Results',
+        'no_results': 'No results found',
+        'try_different': 'Try different search keywords',
+        'read_more': 'Read More',
+        'original_article': 'Original Article',
+        'articles_from': 'news articles from Al Jazeera',
+        'comprehensive_collection': 'Comprehensive collection of',
+        'all_rights_reserved': 'All rights reserved',
+        'previous': 'Previous',
+        'next': 'Next',
+        'searching': 'Searching...',
+        'error_occurred': 'An error occurred while searching. Please try again.',
+        'please_enter_search': 'Please enter search keywords',
+        'copyright': '&copy; 2025 Palestine News Archive - All rights reserved',
+        'back_to_search': 'Back to Search',
+        'article_summary': 'Article Summary:',
+        'full_content': 'Full Content:',
+        'load_full_content': 'Load Full Content',
+        'click_to_load': 'Click "Load Full Content" to view the complete article',
+        'original_link': 'Original Article Link:',
+        'open_on_aljazeera': 'Open Article on Al Jazeera',
+        'article_info': 'Article Information:',
+        'source': 'Source:',
+        'content_type_label': 'Content Type:',
+        'publish_date': 'Publish Date:',
+        'article_id': 'Article ID:',
+        'actions': 'Actions:',
+        'share_article': 'Share Article',
+        'print_article': 'Print Article',
+        'related_articles': 'Related Articles',
+        'loading': 'Loading...',
+        'cannot_load_related': 'Cannot load related articles at this time',
+        'no_related_articles': 'No related articles found',
+        'loading_content': 'Loading content...',
+        'loading_full_content': 'Loading full article content...',
+        'error_loading_content': 'An error occurred while loading content. Please try again.',
+        'link_copied': 'Article link copied to clipboard',
+        'choose_date': 'Select a date to view all headlines from that day',
+        'select_date': 'Select Date',
+        'date': 'Date',
+        'show_headlines': 'Show Headlines',
+        'export_headlines_only': 'Export to Word (Headlines Only)',
+        'export_full_content': 'Export to Word (Full Content)',
+        'headlines_by_date': 'Headlines by Date',
+        'headlines_title': 'Headlines',
+        'no_articles_date': 'No articles found for this date',
+        'try_another_date': 'Try another date or verify the selected date',
+        'please_select_date': 'Please select a date first',
+        'exporting': 'Exporting...',
+        'tools_dashboard': 'Tools Dashboard',
+        'tools_description': 'Manage downloads, create files, and work with images easily',
+        'create_word_files': 'Create Word Files',
+        'file_type': 'File Type',
+        'word_with_summaries': 'Word file with headlines and summaries (as in headlines page)',
+        'word_headlines_full': 'Word file containing headlines followed by full content (no summary)',
+        'word_with_images': 'Word file including images with full content for each article',
+        'creating_file': 'Creating file...',
+        'starting_process': 'Starting process...',
+        'preparing': 'Preparing...',
+        'cancel': 'Cancel',
+        'download_images': 'Download Images',
+        'date_optional': 'Date (Optional)',
+        'leave_empty_all': 'Leave empty to download all images',
+        'max_images': 'Maximum Images (Optional)',
+        'force_reload': 'Reload images even if they exist (Force)',
+        'start_download': 'Start Download',
+        'please_select_date_first': 'Please select a date first.',
+        'completed': 'Completed!',
+        'file_created_success': 'File created successfully! Downloading...',
+        'error_occurred_file': 'An error occurred while creating the file',
+        'close': 'Close',
+        'connection_error': 'A connection error occurred with the server',
+        'downloading_images': 'Downloading images... Please wait.',
+        'image_gallery': 'News Image Gallery',
+        'gallery_description': 'Browse articles with images and discover the most important daily shots',
+        'results_per_page': 'Results per page',
+        'no_articles': 'No articles found',
+        'article_image': 'Article Image',
+        'page': 'Page',
+        'of': 'of',
+        'start_search': 'Start searching to see results',
+        'search_keywords': 'Search Keywords',
+        'search_in_archive': 'Search in Archive',
+        'found_results': 'Found',
+        'result': 'result',
+        'results': 'results',
+        'modify_filters': 'or modify the filters',
+        'show_results': 'Show Results',
+        'reset': 'Reset',
+        'loading_images': 'Loading images...',
+        'no_images_date': 'No articles with images found for this date.',
+        'view_details': 'View Details',
+        'open_image': 'Open Image',
+        'showing': 'Showing',
+        'of': 'of',
+        'articles_with_images': 'articles with images.',
+        'error_loading_images': 'An error occurred while loading images. Please try again.',
+        'export_success_headlines': 'File with headlines and summaries created successfully, downloading...',
+        'export_success': 'File created successfully, downloading...',
+        'export_success_images': 'File with images created successfully, downloading...',
+        'error_downloading_images': 'An error occurred while downloading images.',
+        'requested_images': 'Requested',
+        'image_with_links': 'images with links.',
+        'downloaded_new': 'Downloaded',
+        'new_image': 'new images.',
+        'skipped_existing': 'Skipped',
+        'existing_images': 'existing images.',
+        'errors_during': 'Errors during download:',
+        'folder': 'Folder:'
+    }
+}
+
+# Get current language from session or default to Arabic
+def get_language():
+    return session.get('language', 'ar')
+
+# Add template function for translations
+@app.template_global()
+def t(key):
+    """Get translation for a key"""
+    lang = get_language()
+    return TRANSLATIONS.get(lang, TRANSLATIONS['ar']).get(key, key)
+
+# Add template function for type labels
+@app.template_global()
+def getTypeLabel(article_type):
+    """Convert article type to label based on current language"""
+    lang = get_language()
+    type_key = {
+        'post': 'article',
+        'video': 'video',
+        'liveblog': 'liveblog',
+        'episode': 'episode',
+        'gallery': 'gallery'
+    }.get(article_type, article_type)
+    return t(type_key)
 
 # Add custom filter for number formatting
 @app.template_filter('number_format')
 def number_format(value):
     """Format number with commas"""
     return f"{value:,}"
-
-# Add template function for type labels
-@app.template_global()
-def getTypeLabel(article_type):
-    """Convert article type to Arabic label"""
-    type_labels = {
-        'post': 'مقال',
-        'video': 'فيديو',
-        'liveblog': 'بث مباشر',
-        'episode': 'حلقة',
-        'gallery': 'معرض صور'
-    }
-    return type_labels.get(article_type, article_type)
 
 IMAGES_CACHE_DIR = Path("images_cache")
 TEMP_DIR = Path("temp")
@@ -344,34 +637,45 @@ class NewsAnalyzer:
 # Initialize analyzer
 analyzer = NewsAnalyzer('articles_combined.json')
 
+@app.route('/set_language/<lang>')
+def set_language(lang):
+    """Set language preference"""
+    if lang in ['ar', 'en']:
+        session['language'] = lang
+    return redirect(request.referrer or url_for('index'))
+
 @app.route('/')
 def index():
-    """Main page"""
+    """Main page - Direct search interface"""
     stats = analyzer.get_statistics()
-    timeline_data = analyzer.get_timeline_data()
-    return render_template('index.html', stats=stats, timeline_data=timeline_data)
+    lang = get_language()
+    return render_template('index.html', stats=stats, lang=lang)
 
 @app.route('/search')
 def search():
-    """Search page"""
-    return render_template('search.html')
+    """Search page - redirect to home (search is now on home page)"""
+    lang = get_language()
+    return render_template('index.html', stats=analyzer.get_statistics(), lang=lang)
 
 @app.route('/headlines')
 def headlines():
     """Headlines by date page"""
-    return render_template('headlines.html')
+    lang = get_language()
+    return render_template('headlines.html', lang=lang)
 
 
 @app.route('/images')
 def images():
     """Images gallery page"""
-    return render_template('images.html')
+    lang = get_language()
+    return render_template('images.html', lang=lang)
 
 
 @app.route('/tools')
 def tools():
     """Tools page"""
-    return render_template('tools.html')
+    lang = get_language()
+    return render_template('tools.html', lang=lang)
 
 @app.route('/api/search')
 def api_search():
@@ -1495,10 +1799,11 @@ def api_export_word():
 @app.route('/article/<int:article_id>')
 def article_detail(article_id):
     """Article detail page"""
+    lang = get_language()
     article = next((a for a in analyzer.articles if a.get('id') == article_id), None)
     if not article:
         return "Article not found", 404
-    return render_template('article_detail.html', article=article)
+    return render_template('article_detail.html', article=article, lang=lang)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

@@ -1,105 +1,97 @@
 {% extends "base.html" %}
 
-{% block title %}الرئيسية - أرشيف أخبار فلسطين{% endblock %}
+{% block title %}{{ t('app_name') }} - {{ t('search') }}{% endblock %}
 
 {% block content %}
-<!-- Hero Section -->
+<!-- Hero Section - Compact -->
 <section class="hero-section">
     <div class="container">
-        <h1 class="hero-title">أرشيف أخبار فلسطين</h1>
-        <p class="hero-subtitle">مجموعة شاملة من {{ stats.total_articles | number_format }} مقال إخباري من الجزيرة نت</p>
-        <a href="/search" class="btn btn-primary btn-lg">
-            <i class="fas fa-search me-2"></i>
-            ابدأ البحث
-        </a>
+        <h1 class="hero-title">{{ t('app_name') }}</h1>
+        <p class="hero-subtitle">{{ stats.total_articles | number_format }} {{ t('articles_from') }}</p>
     </div>
 </section>
 
-<!-- Statistics Section -->
-<section class="py-5">
+<!-- Statistics Section - Compact -->
+<section class="py-3">
     <div class="container">
-        <div class="row g-4">
-            <div class="col-md-3">
+        <div class="row g-3">
+            <div class="col-md-3 col-6">
                 <div class="stats-card">
                     <div class="stats-number">{{ stats.total_articles | number_format }}</div>
-                    <div class="stats-label">مقال إخباري</div>
+                    <div class="stats-label">{{ t('total_articles') }}</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
                 <div class="stats-card">
                     <div class="stats-number">{{ stats.article_types.post | number_format }}</div>
-                    <div class="stats-label">مقالات عادية</div>
+                    <div class="stats-label">{{ t('articles') }}</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
                 <div class="stats-card">
                     <div class="stats-number">{{ stats.article_types.video | number_format }}</div>
-                    <div class="stats-label">فيديوهات</div>
+                    <div class="stats-label">{{ t('videos') }}</div>
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-3 col-6">
                 <div class="stats-card">
                     <div class="stats-number">{{ stats.article_types.liveblog | number_format }}</div>
-                    <div class="stats-label">بث مباشر</div>
+                    <div class="stats-label">{{ t('live_blog') }}</div>
                 </div>
             </div>
         </div>
     </div>
 </section>
 
-<!-- Timeline Chart -->
-<section class="py-5 bg-light">
-    <div class="container">
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title mb-0">
-                            <i class="fas fa-chart-line me-2"></i>
-                            توزيع المقالات عبر الزمن
-                        </h3>
-                    </div>
-                    <div class="card-body">
-                        <canvas id="timelineChart" height="100"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
-
-<!-- Quick Search -->
-<section class="py-5">
+<!-- Main Search Interface -->
+<section class="py-4">
     <div class="container">
         <div class="row justify-content-center">
-            <div class="col-md-8">
+            <div class="col-lg-10">
                 <div class="card">
-                    <div class="card-body text-center">
-                        <h3 class="card-title mb-4">البحث السريع</h3>
-                        <form id="quickSearchForm">
-                            <div class="input-group mb-3">
-                                <input type="text" class="form-control search-box" id="quickSearch" 
-                                       placeholder="ابحث عن كلمات مفتاحية...">
-                                <button class="btn btn-primary" type="submit">
-                                    <i class="fas fa-search"></i>
-                                </button>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <select class="form-select" id="contentType">
-                                        <option value="all">جميع الأنواع</option>
-                                        <option value="post">مقالات</option>
-                                        <option value="video">فيديوهات</option>
-                                        <option value="liveblog">بث مباشر</option>
-                                        <option value="episode">حلقات</option>
+                    <div class="card-body">
+                        <form id="mainSearchForm">
+                            <div class="row g-3">
+                                <div class="col-md-8">
+                                    <label class="form-label fw-bold">{{ t('search_archive') }}</label>
+                                    <input type="text" class="form-control search-box form-control-lg" 
+                                           id="mainSearch" placeholder="{{ t('search_placeholder') }}" autofocus>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">{{ t('content_type') }}</label>
+                                    <select class="form-select form-select-lg" id="contentType">
+                                        <option value="all">{{ t('all_types') }}</option>
+                                        <option value="post">{{ t('articles') }}</option>
+                                        <option value="video">{{ t('videos') }}</option>
+                                        <option value="liveblog">{{ t('live_blog') }}</option>
+                                        <option value="episode">{{ t('episodes') }}</option>
                                     </select>
                                 </div>
-                                <div class="col-md-6">
+                            </div>
+                            <div class="row g-3 mt-2">
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('search_type') }}</label>
                                     <select class="form-select" id="searchType">
-                                        <option value="all">العنوان والمحتوى</option>
-                                        <option value="title">العنوان فقط</option>
-                                        <option value="excerpt">المحتوى فقط</option>
+                                        <option value="all">{{ t('title_and_content') }}</option>
+                                        <option value="title">{{ t('title_only') }}</option>
+                                        <option value="excerpt">{{ t('content_only') }}</option>
                                     </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('from_date') }}</label>
+                                    <input type="date" class="form-control" id="dateFrom">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ t('to_date') }}</label>
+                                    <input type="date" class="form-control" id="dateTo">
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-primary btn-lg w-100">
+                                        <i class="fas fa-search me-2"></i>
+                                        {{ t('search') }}
+                                    </button>
                                 </div>
                             </div>
                         </form>
@@ -110,44 +102,23 @@
     </div>
 </section>
 
-<!-- Popular Keywords -->
-<section class="py-5 bg-light">
+<!-- Quick Keywords -->
+<section class="py-3">
     <div class="container">
         <div class="row">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title mb-0">
-                            <i class="fas fa-tags me-2"></i>
-                            الكلمات المفتاحية الشائعة
-                        </h3>
-                    </div>
                     <div class="card-body">
-                        <div class="row" id="keywordsContainer">
-                            <div class="col-md-3 mb-2">
-                                <button class="btn btn-outline-primary keyword-btn" data-keyword="غزة">غزة</button>
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <button class="btn btn-outline-primary keyword-btn" data-keyword="الضفة">الضفة</button>
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <button class="btn btn-outline-primary keyword-btn" data-keyword="القدس">القدس</button>
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <button class="btn btn-outline-primary keyword-btn" data-keyword="حماس">حماس</button>
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <button class="btn btn-outline-primary keyword-btn" data-keyword="إسرائيل">إسرائيل</button>
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <button class="btn btn-outline-primary keyword-btn" data-keyword="الاحتلال">الاحتلال</button>
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <button class="btn btn-outline-primary keyword-btn" data-keyword="شهداء">شهداء</button>
-                            </div>
-                            <div class="col-md-3 mb-2">
-                                <button class="btn btn-outline-primary keyword-btn" data-keyword="مفاوضات">مفاوضات</button>
-                            </div>
+                        <h5 class="card-title mb-3">{{ t('quick_keywords') }}</h5>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button class="btn btn-outline-primary keyword-btn" data-keyword="غزة">غزة</button>
+                            <button class="btn btn-outline-primary keyword-btn" data-keyword="الضفة">الضفة</button>
+                            <button class="btn btn-outline-primary keyword-btn" data-keyword="القدس">القدس</button>
+                            <button class="btn btn-outline-primary keyword-btn" data-keyword="حماس">حماس</button>
+                            <button class="btn btn-outline-primary keyword-btn" data-keyword="إسرائيل">إسرائيل</button>
+                            <button class="btn btn-outline-primary keyword-btn" data-keyword="الاحتلال">الاحتلال</button>
+                            <button class="btn btn-outline-primary keyword-btn" data-keyword="شهداء">شهداء</button>
+                            <button class="btn btn-outline-primary keyword-btn" data-keyword="مفاوضات">مفاوضات</button>
                         </div>
                     </div>
                 </div>
@@ -155,66 +126,108 @@
         </div>
     </div>
 </section>
+
+<!-- Search Results Section -->
+<section class="py-3" id="resultsSection" style="display: none;">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <div id="searchResults"></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Pagination -->
+<div class="container mb-4">
+    <div class="row">
+        <div class="col-12">
+            <nav id="pagination" style="display: none;">
+                <ul class="pagination justify-content-center"></ul>
+            </nav>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Timeline Chart
-const timelineData = {{ timeline_data | tojson | safe }};
-const ctx = document.getElementById('timelineChart').getContext('2d');
-new Chart(ctx, {
-    type: 'line',
-    data: {
-        labels: timelineData.map(item => item[0]),
-        datasets: [{
-            label: 'عدد المقالات',
-            data: timelineData.map(item => item[1]),
-            borderColor: '#667eea',
-            backgroundColor: 'rgba(102, 126, 234, 0.1)',
-            tension: 0.4,
-            fill: true
-        }]
+// Translations for JavaScript
+const translations = {
+    'ar': {
+        'searching': 'جاري البحث...',
+        'no_results': 'لم يتم العثور على نتائج',
+        'try_different': 'جرب كلمات بحث مختلفة',
+        'search_results': 'نتائج البحث',
+        'article': 'مقال',
+        'read_more': 'قراءة المزيد',
+        'original_article': 'المقال الأصلي',
+        'previous': 'السابق',
+        'next': 'التالي',
+        'please_enter_search': 'يرجى إدخال كلمات البحث',
+        'error_occurred': 'حدث خطأ أثناء البحث. يرجى المحاولة مرة أخرى.',
+        'not_specified': 'غير محدد',
+        'no_title': 'بدون عنوان'
     },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: {
-                labels: {
-                    font: {
-                        family: 'Noto Sans Arabic'
-                    }
-                }
-            }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: {
-                    font: {
-                        family: 'Noto Sans Arabic'
-                    }
-                }
-            },
-            x: {
-                ticks: {
-                    font: {
-                        family: 'Noto Sans Arabic'
-                    }
-                }
-            }
-        }
+    'en': {
+        'searching': 'Searching...',
+        'no_results': 'No results found',
+        'try_different': 'Try different search keywords',
+        'search_results': 'Search Results',
+        'article': 'article',
+        'read_more': 'Read More',
+        'original_article': 'Original Article',
+        'previous': 'Previous',
+        'next': 'Next',
+        'please_enter_search': 'Please enter search keywords',
+        'error_occurred': 'An error occurred while searching. Please try again.',
+        'not_specified': 'Not specified',
+        'no_title': 'No title'
     }
+};
+
+const currentLang = '{{ lang }}';
+const t = (key) => translations[currentLang]?.[key] || key;
+
+const typeLabels = {
+    'ar': {
+        'post': 'مقال',
+        'video': 'فيديو',
+        'liveblog': 'بث مباشر',
+        'episode': 'حلقة',
+        'gallery': 'معرض صور'
+    },
+    'en': {
+        'post': 'Article',
+        'video': 'Video',
+        'liveblog': 'Live Blog',
+        'episode': 'Episode',
+        'gallery': 'Gallery'
+    }
+};
+
+function getTypeLabel(type) {
+    return typeLabels[currentLang]?.[type] || type;
+}
+
+let currentPage = 1;
+let currentQuery = '';
+let currentSearchType = 'all';
+let currentContentType = 'all';
+let currentDateFrom = '';
+let currentDateTo = '';
+
+// Main search form
+document.getElementById('mainSearchForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    performSearch();
 });
 
-// Quick Search
-document.getElementById('quickSearchForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const query = document.getElementById('quickSearch').value;
-    const contentType = document.getElementById('contentType').value;
-    const searchType = document.getElementById('searchType').value;
-    
-    if (query.trim()) {
-        window.location.href = `/search?q=${encodeURIComponent(query)}&content_type=${contentType}&type=${searchType}`;
+// Enter key on search box
+document.getElementById('mainSearch').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        performSearch();
     }
 });
 
@@ -222,8 +235,178 @@ document.getElementById('quickSearchForm').addEventListener('submit', function(e
 document.querySelectorAll('.keyword-btn').forEach(btn => {
     btn.addEventListener('click', function() {
         const keyword = this.dataset.keyword;
-        window.location.href = `/search?q=${encodeURIComponent(keyword)}`;
+        document.getElementById('mainSearch').value = keyword;
+        performSearch();
     });
 });
+
+function performSearch(page = 1) {
+    const query = document.getElementById('mainSearch').value.trim();
+    const searchType = document.getElementById('searchType').value;
+    const contentType = document.getElementById('contentType').value;
+    const dateFrom = document.getElementById('dateFrom').value;
+    const dateTo = document.getElementById('dateTo').value;
+    
+    if (!query) {
+        alert(t('please_enter_search'));
+        return;
+    }
+    
+    currentPage = page;
+    currentQuery = query;
+    currentSearchType = searchType;
+    currentContentType = contentType;
+    currentDateFrom = dateFrom;
+    currentDateTo = dateTo;
+    
+    // Show loading
+    document.getElementById('resultsSection').style.display = 'block';
+    document.getElementById('searchResults').innerHTML = `<div class="text-center py-4"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">${t('searching')}</span></div></div>`;
+    
+    // Build API URL
+    let apiUrl = `/api/search?q=${encodeURIComponent(query)}&type=${searchType}&content_type=${contentType}&page=${page}&per_page=20`;
+    if (dateFrom) apiUrl += `&date_from=${dateFrom}`;
+    if (dateTo) apiUrl += `&date_to=${dateTo}`;
+    
+    // Scroll to results
+    document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
+    fetch(apiUrl)
+        .then(response => response.json())
+        .then(data => {
+            displayResults(data);
+            updatePagination(data);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('searchResults').innerHTML = `<div class="alert alert-danger">${t('error_occurred')}</div>`;
+        });
+}
+
+function displayResults(data) {
+    const resultsDiv = document.getElementById('searchResults');
+    
+    if (data.total === 0) {
+        resultsDiv.innerHTML = `
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">${t('no_results')}</h4>
+                    <p class="text-muted">${t('try_different')}</p>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = `
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">${t('search_results')}: ${data.total.toLocaleString()} ${t('article')}${currentLang === 'en' ? (data.total !== 1 ? 's' : '') : ''}</h5>
+            </div>
+            <div class="card-body">
+    `;
+    
+    data.articles.forEach(article => {
+        const typeLabel = getTypeLabel(article.type || 'post');
+        const typeClass = `article-type-${article.type || 'post'}`;
+        const date = article.date || t('not_specified');
+        
+        html += `
+            <div class="article-card card mb-3">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="article-type-badge ${typeClass}">${typeLabel}</span>
+                        <small class="text-muted">${date}</small>
+                    </div>
+                    <h5 class="card-title">
+                        <a href="/article/${article.id}" class="text-decoration-none" style="color: #2c3e50;">
+                            ${article.title || t('no_title')}
+                        </a>
+                    </h5>
+                    ${article.excerpt ? `<p class="card-text text-muted">${article.excerpt.substring(0, 200)}${article.excerpt.length > 200 ? '...' : ''}</p>` : ''}
+                    <div class="mt-2">
+                        <a href="/article/${article.id}" class="btn btn-sm btn-outline-primary">${t('read_more')}</a>
+                        ${article.link ? `<a href="${article.link}" target="_blank" class="btn btn-sm btn-outline-secondary">${t('original_article')}</a>` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    html += `
+            </div>
+        </div>
+    `;
+    
+    resultsDiv.innerHTML = html;
+}
+
+function updatePagination(data) {
+    const pagination = document.getElementById('pagination');
+    const paginationUl = pagination.querySelector('ul');
+    
+    if (data.total_pages <= 1) {
+        pagination.style.display = 'none';
+        return;
+    }
+    
+    pagination.style.display = 'block';
+    paginationUl.innerHTML = '';
+    
+    // Previous button
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${data.page === 1 ? 'disabled' : ''}`;
+    prevLi.innerHTML = `<a class="page-link" href="#" onclick="performSearch(${data.page - 1}); return false;">${t('previous')}</a>`;
+    paginationUl.appendChild(prevLi);
+    
+    // Page numbers
+    const maxPages = 10;
+    let startPage = Math.max(1, data.page - Math.floor(maxPages / 2));
+    let endPage = Math.min(data.total_pages, startPage + maxPages - 1);
+    
+    if (endPage - startPage < maxPages - 1) {
+        startPage = Math.max(1, endPage - maxPages + 1);
+    }
+    
+    if (startPage > 1) {
+        const firstLi = document.createElement('li');
+        firstLi.className = 'page-item';
+        firstLi.innerHTML = `<a class="page-link" href="#" onclick="performSearch(1); return false;">1</a>`;
+        paginationUl.appendChild(firstLi);
+        if (startPage > 2) {
+            const ellipsis = document.createElement('li');
+            ellipsis.className = 'page-item disabled';
+            ellipsis.innerHTML = '<span class="page-link">...</span>';
+            paginationUl.appendChild(ellipsis);
+        }
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === data.page ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" onclick="performSearch(${i}); return false;">${i}</a>`;
+        paginationUl.appendChild(li);
+    }
+    
+    if (endPage < data.total_pages) {
+        if (endPage < data.total_pages - 1) {
+            const ellipsis = document.createElement('li');
+            ellipsis.className = 'page-item disabled';
+            ellipsis.innerHTML = '<span class="page-link">...</span>';
+            paginationUl.appendChild(ellipsis);
+        }
+        const lastLi = document.createElement('li');
+        lastLi.className = 'page-item';
+        lastLi.innerHTML = `<a class="page-link" href="#" onclick="performSearch(${data.total_pages}); return false;">${data.total_pages}</a>`;
+        paginationUl.appendChild(lastLi);
+    }
+    
+    // Next button
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${data.page === data.total_pages ? 'disabled' : ''}`;
+    nextLi.innerHTML = `<a class="page-link" href="#" onclick="performSearch(${data.page + 1}); return false;">${t('next')}</a>`;
+    paginationUl.appendChild(nextLi);
+}
 </script>
 {% endblock %}
