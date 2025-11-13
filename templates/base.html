@@ -27,15 +27,12 @@
             min-height: 100vh;
             color: #2c3e50;
         }
-        {% if lang == 'ar' %}
-        body {
+        body.lang-ar {
             font-family: 'Noto Sans Arabic', 'Amiri', Arial, sans-serif;
         }
-        {% else %}
-        body {
+        body.lang-en {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        {% endif %}
         
         .navbar {
             background: #ffffff !important;
@@ -263,7 +260,7 @@
         }
     </style>
 </head>
-<body>
+Ilike like looked at it though <body class="lang-{{ lang }}">
     <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light fixed-top">
         <div class="container">
